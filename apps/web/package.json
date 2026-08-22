@@ -2,6 +2,9 @@
   "name": "@klassiq-transakt/web",
   "version": "1.0.0",
   "private": true,
+  "prisma": {
+    "schema": "../../packages/db/prisma/schema.prisma"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
