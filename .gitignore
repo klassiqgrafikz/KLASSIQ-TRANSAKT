@@ -51,4 +51,5 @@ desktop.ini
 
 # Misc
 *.pem
-*.key
+*.keyapps/web/.admin-credentials.txt
+.admin-credentials.txt
