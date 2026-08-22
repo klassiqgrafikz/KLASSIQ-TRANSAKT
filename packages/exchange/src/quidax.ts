@@ -1,0 +1,316 @@
+import axios, { AxiosInstance } from 'axios';
+import { z } from 'zod';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams } from './types';
+import { env } from '@klassiq-transakt/config';
+
+const QuidaxWebhookSchema = z.object({
+  event: z.string(),
+  data: z.record(z.unknown()),
+});
+
+export class QuidaxAdapter implements ExchangeAdapter {
+  readonly provider = ExchangeProvider.QUIDAX;
+  private client: AxiosInstance;
+  private webhookSecret: string;
+
+  constructor() {
+    this.webhookSecret = env.QUIDAX_WEBHOOK_SECRET || '';
+    this.client = axios.create({
+      baseURL: env.QUIDAX_BASE_URL,
+      headers: {
+        'Authorization': `Bearer ${env.QUIDAX_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      timeout: 30000,
+    });
+  }
+
+  async getRate(fromCurrency: string, toCurrency: string): Promise<RateQuote> {
+    const market = `${fromCurrency.toLowerCase()}${toCurrency.toLowerCase()}`;
+    const response = await this.client.get(`/markets/${market}/ticker`);
+    const data = response.data.data;
+
+    return {
+      fromCurrency,
+      toCurrency,
+      rate: parseFloat(data.last),
+      fee: 0, // Quidax fees are included in market order execution
+      provider: this.provider,
+      expiresAt: new Date(Date.now() + 60000),
+    };
+  }
+
+  async getMarketPrice(base: string, quote: string): Promise<number> {
+    const quoteResponse = await this.getRate(base, quote);
+    return quoteResponse.rate;
+  }
+
+  async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {
+    const currency = 'BTC';
+    const response = await this.client.post('/users/me/addresses', {
+      currency,
+      network: network === Network.LIGHTNING ? 'lightning' : 'bitcoin',
+    });
+
+    const data = response.data.data;
+    return {
+      address: data.address,
+      network,
+      depositId: data.id,
+    };
+  }
+
+  async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
+    const response = await this.client.get(`/users/me/deposits/${depositId}`);
+    const data = response.data.data;
+
+    const statusMap: Record<string, TxnStatus> = {
+      submitted: TxnStatus.PENDING,
+      confirmed: TxnStatus.COMPLETED,
+      accepted: TxnStatus.COMPLETED,
+      rejected: TxnStatus.FAILED,
+    };
+
+    return {
+      status: statusMap[data.status] || TxnStatus.PENDING,
+      btcAmount: data.amount ? parseFloat(data.amount) : undefined,
+      btcTxHash: data.txid,
+    };
+  }
+
+  async createMarketSell(btcAmount: number): Promise<SellOrder> {
+    const response = await this.client.post('/users/me/orders', {
+      market: 'btcngn',
+      side: 'sell',
+      ord_type: 'market',
+      volume: btcAmount.toString(),
+    });
+
+    const data = response.data.data;
+    return this.mapSellOrder(data);
+  }
+
+  async getOrderStatus(orderId: string): Promise<SellOrder> {
+    const response = await this.client.get(`/users/me/orders/${orderId}`);
+    return this.mapSellOrder(response.data.data);
+  }
+
+  async pollOrderUntilDone(orderId: string, timeoutMs = 15000, intervalMs = 1500): Promise<SellOrder> {
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+      const order = await this.getOrderStatus(orderId);
+      if (order.status === TxnStatus.COMPLETED) return order;
+      if (order.status === TxnStatus.FAILED) throw new Error(`Order failed: ${orderId}`);
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error(`Order fill timeout after ${timeoutMs}ms for order ${orderId}`);
+  }
+
+  async withdrawNgn(params: WithdrawalParams): Promise<Withdrawal> {
+    const response = await this.client.post('/users/me/withdraws', {
+      currency: 'ngn',
+      amount: params.amount.toFixed(2),
+      fund_uid: params.accountNumber,
+      fund_uid2: params.bankCode,
+      reference: params.reference,
+      narration: params.narration || 'KLASSIQ TRANSAKT withdrawal',
+    });
+
+    const data = response.data.data;
+    return this.mapWithdrawal(data);
+  }
+
+  async getWithdrawalStatus(withdrawalId: string): Promise<Withdrawal> {
+    const response = await this.client.get(`/users/me/withdraws/${withdrawalId}`);
+    return this.mapWithdrawal(response.data.data);
+  }
+
+  async getBanks(): Promise<Bank[]> {
+    try {
+      const response = await axios.get('https://ramp-be.quidax.io/api/v1/merchants/custodial/banks', {
+        params: { country: 'NG' },
+        headers: {
+          'x-private-key': env.QUIDAX_API_KEY,
+        },
+      });
+
+      return response.data.data.map((bank: any) => ({
+        code: bank.code,
+        name: bank.name,
+        slug: bank.name.toLowerCase().replace(/\s+/g, '-'),
+      }));
+    } catch (error) {
+      console.warn('Failed to fetch banks from Quidax, using fallback');
+      return this.getFallbackBanks();
+    }
+  }
+
+  private getFallbackBanks(): Bank[] {
+    return [
+      { code: '044', name: 'Access Bank', slug: 'access-bank' },
+      { code: '023', name: 'Citi Bank', slug: 'citi-bank' },
+      { code: '050', name: 'Ecobank Nigeria', slug: 'ecobank-nigeria' },
+      { code: '011', name: 'First Bank of Nigeria', slug: 'first-bank-of-nigeria' },
+      { code: '214', name: 'First City Monument Bank', slug: 'first-city-monument-bank' },
+      { code: '070', name: 'Fidelity Bank', slug: 'fidelity-bank' },
+      { code: '058', name: 'Guaranty Trust Bank', slug: 'guaranty-trust-bank' },
+      { code: '030', name: 'Heritage Bank', slug: 'heritage-bank' },
+      { code: '082', name: 'Keystone Bank', slug: 'keystone-bank' },
+      { code: '076', name: 'Polaris Bank', slug: 'polaris-bank' },
+      { code: '101', name: 'Providus Bank', slug: 'providus-bank' },
+      { code: '221', name: 'Stanbic IBTC Bank', slug: 'stanbic-ibtc-bank' },
+      { code: '068', name: 'Standard Chartered Bank', slug: 'standard-chartered-bank' },
+      { code: '232', name: 'Sterling Bank', slug: 'sterling-bank' },
+      { code: '100', name: 'Suntrust Bank', slug: 'suntrust-bank' },
+      { code: '032', name: 'Union Bank of Nigeria', slug: 'union-bank-of-nigeria' },
+      { code: '033', name: 'United Bank for Africa', slug: 'united-bank-for-africa' },
+      { code: '215', name: 'Unity Bank', slug: 'unity-bank' },
+      { code: '035', name: 'Wema Bank', slug: 'wema-bank' },
+      { code: '057', name: 'Zenith Bank', slug: 'zenith-bank' },
+    ];
+  }
+
+  verifyWebhook(payload: string, signature: string): WebhookEvent {
+    const crypto = require('crypto');
+
+    const parts = signature.split(',');
+    if (parts.length !== 2) {
+      throw new Error('Invalid Quidax signature format');
+    }
+
+    const timestampPart = parts[0].split('=');
+    const signaturePart = parts[1].split('=');
+
+    if (timestampPart[0] !== 't' || signaturePart[0] !== 'v1') {
+      throw new Error('Invalid Quidax signature format');
+    }
+
+    const timestamp = timestampPart[1];
+    const receivedSignature = signaturePart[1];
+
+    const expectedPayload = `${timestamp}.${payload}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.webhookSecret)
+      .update(expectedPayload)
+      .digest('hex');
+
+    if (!crypto.timingSafeEqual(
+      Buffer.from(receivedSignature, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    )) {
+      throw new Error('Invalid Quidax webhook signature');
+    }
+
+    const parsed = JSON.parse(payload);
+    const validated = QuidaxWebhookSchema.parse(parsed);
+
+    return {
+      event: validated.event,
+      provider: this.provider,
+      data: validated.data,
+      rawPayload: payload,
+      signature,
+      timestamp: parseInt(timestamp, 10) * 1000,
+    };
+  }
+
+  parseWebhookEvent(event: WebhookEvent): {
+    type: 'deposit' | 'sell' | 'withdraw';
+    status: TxnStatus;
+    externalId: string;
+    amount?: number;
+    currency?: string;
+    metadata: Record<string, unknown>;
+  } {
+    const data = event.data as Record<string, unknown>;
+
+    if (event.event === 'deposit.successful') {
+      return {
+        type: 'deposit',
+        status: TxnStatus.COMPLETED,
+        externalId: data.id as string,
+        amount: data.amount ? parseFloat(data.amount as string) : undefined,
+        currency: data.currency as string,
+        metadata: data,
+      };
+    }
+
+    if (event.event === 'sell_transaction.successful' || event.event === 'sell_transaction.processing') {
+      const status = data.status === 'completed' ? TxnStatus.COMPLETED : TxnStatus.PROCESSING;
+      return {
+        type: 'sell',
+        status,
+        externalId: data.public_id as string,
+        amount: data.from_amount ? parseFloat(data.from_amount as string) : undefined,
+        currency: data.from_currency as string,
+        metadata: data,
+      };
+    }
+
+    if (event.event === 'withdraw.successful') {
+      return {
+        type: 'withdraw',
+        status: TxnStatus.COMPLETED,
+        externalId: data.id as string,
+        amount: data.amount ? parseFloat(data.amount as string) : undefined,
+        currency: data.currency as string,
+        metadata: data,
+      };
+    }
+
+    return {
+      type: 'deposit',
+      status: TxnStatus.PENDING,
+      externalId: 'unknown',
+      metadata: data,
+    };
+  }
+
+  private mapSellOrder(data: any): SellOrder {
+    const statusMap: Record<string, TxnStatus> = {
+      wait: TxnStatus.PENDING,
+      done: TxnStatus.COMPLETED,
+      cancel: TxnStatus.FAILED,
+      reject: TxnStatus.FAILED,
+      partial: TxnStatus.PROCESSING,
+    };
+
+    return {
+      id: data.id,
+      btcAmount: parseFloat(data.origin_volume?.amount || data.volume?.amount || '0'),
+      ngnAmount: parseFloat(data.executed_volume?.amount || '0') * parseFloat(data.avg_price?.amount || '0'),
+      rate: parseFloat(data.avg_price?.amount || data.price?.amount || '0'),
+      fee: 0,
+      status: statusMap[data.status] || TxnStatus.PENDING,
+      providerOrderId: data.id,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      completedAt: data.done_at ? new Date(data.done_at) : undefined,
+    };
+  }
+
+  private mapWithdrawal(data: any): Withdrawal {
+    const statusMap: Record<string, TxnStatus> = {
+      Processing: TxnStatus.PROCESSING,
+      Done: TxnStatus.COMPLETED,
+      Rejected: TxnStatus.FAILED,
+      Failed: TxnStatus.FAILED,
+    };
+
+    return {
+      id: data.id,
+      ngnAmount: parseFloat(data.amount || '0'),
+      fee: parseFloat(data.fee || '0'),
+      bankCode: data.fund_uid2 || data.recipient?.details?.bank_code || '',
+      accountNumber: data.fund_uid || '',
+      status: statusMap[data.status] || TxnStatus.PENDING,
+      providerWithdrawalId: data.id,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      completedAt: data.done_at ? new Date(data.done_at) : undefined,
+    };
+  }
+}

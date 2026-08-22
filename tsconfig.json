@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@klassiq-transakt/db/*": ["packages/db/src/*"],
+      "@klassiq-transakt/ui/*": ["packages/ui/src/*"],
+      "@klassiq-transakt/exchange/*": ["packages/exchange/src/*"],
+      "@klassiq-transakt/config/*": ["packages/config/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", ".next"]
+}

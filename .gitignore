@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment variables (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+apps/web/.env
+apps/api/.env
+packages/*/.env
+
+# Keep the template
+!.env.example
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime data
+processed_tx.json
+*.log
+logs/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Prisma
+packages/db/prisma/*.db
+packages/db/prisma/dev.db*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Turbo
+.turbo/
+
+# Vercel
+.vercel
+
+# Misc
+*.pem
+*.key

@@ -1,0 +1,45 @@
+{
+  "name": "@klassiq-transakt/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "next": "^14.2.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next-auth": "^5.0.0-beta.18",
+    "@prisma/client": "^5.13.0",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.22.4",
+    "resend": "^3.5.0",
+    "@klassiq-transakt/ui": "*",
+    "@klassiq-transakt/db": "*",
+    "@klassiq-transakt/exchange": "*",
+    "@klassiq-transakt/config": "*",
+    "lucide-react": "^0.372.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.2",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "@types/bcryptjs": "^2.4.6",
+    "typescript": "^5.4.5",
+    "tailwindcss": "^3.4.3",
+    "postcss": "^8.4.38",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.3",
+    "prisma": "^5.13.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": []
+    },
+    "db:generate": {
+      "outputs": ["node_modules/.prisma/client/**"]
+    },
+    "db:push": {
+      "dependsOn": ["db:generate"]
+    },
+    "db:studio": {
+      "cache": false
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "dependsOn": []
+    }
+  },
+  "globalEnv": ["DATABASE_URL", "NEXTAUTH_SECRET", "YELLOWCARD_API_KEY"]
+}
