@@ -45,17 +45,17 @@ export default auth((req) => {
   }
 
   // Check admin access
-  if (isAdminPath && req.auth.user.role !== 'ADMIN') {
+  if (isAdminPath && req.auth?.user?.role !== 'ADMIN') {
     return NextResponse.redirect(new URL('/dashboard', nextUrl));
   }
 
   // Check if user is suspended
-  if (req.auth.user.status === 'SUSPENDED') {
+  if (req.auth?.user?.status === 'SUSPENDED') {
     return NextResponse.redirect(new URL('/auth/suspended', nextUrl));
   }
 
   // Check if user needs KYC
-  if (req.auth.user.status === 'KYC_REQUIRED' && !nextUrl.pathname.startsWith('/kyc')) {
+  if (req.auth?.user?.status === 'KYC_REQUIRED' && !nextUrl.pathname.startsWith('/kyc')) {
     return NextResponse.redirect(new URL('/kyc', nextUrl));
   }
 

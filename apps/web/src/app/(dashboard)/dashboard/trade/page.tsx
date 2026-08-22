@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Input } from '@klassiq-transakt/ui/components/Input';
 import { Label } from '@klassiq-transakt/ui/components/Label';
@@ -11,7 +12,7 @@ import { Badge } from '@klassiq-transakt/ui/components/Badge';
 import { Alert, AlertDescription, AlertTitle } from '@klassiq-transakt/ui/components/Alert';
 import { Dialog, AlertDialog } from '@klassiq-transakt/ui/components/Dialog';
 import { formatNgn, formatBtc, cn } from '@klassiq-transakt/ui/lib/utils';
-import { Bitcoin, ArrowRight, Loader2, AlertCircle, CheckCircle, XCircle, QRCode, Copy, Trash2, Edit, ExternalLink, DollarSign, TrendingUp, RefreshCw, Shield } from 'lucide-react';
+import { Bitcoin, ArrowRight, Loader2, AlertCircle, CheckCircle, XCircle, QrCode, Copy, Trash2, Edit, ExternalLink, DollarSign, TrendingUp, RefreshCw, Shield } from 'lucide-react';
 
 interface BankAccount {
   id: string;
@@ -407,7 +408,7 @@ export default function TradePage() {
                 />
               ) : (
                 <div className="mx-auto h-64 w-64 flex items-center justify-center rounded-lg border bg-muted/50">
-                  <QRCode className="h-16 w-16 text-muted-foreground" />
+                  <QrCode className="h-16 w-16 text-muted-foreground" />
                 </div>
               )}
             </div>

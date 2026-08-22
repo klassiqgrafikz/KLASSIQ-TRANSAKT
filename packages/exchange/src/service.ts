@@ -47,6 +47,10 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.withFallback(adapter => adapter.createDepositAddress(network, amount));
   }
 
+  async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
+    return this.withFallback(adapter => adapter.getDepositStatus(depositId));
+  }
+
   async sellBtc(btcAmount: number): Promise<SellOrder> {
     return this.withFallback(adapter => adapter.createMarketSell(btcAmount));
   }
@@ -86,7 +90,7 @@ class ExchangeServiceImpl implements ExchangeService {
           create: {
             code: bank.code,
             name: bank.name,
-            slug: bank.slug,
+            slug: bank.slug || bank.code,
             isActive: true,
           },
         });
@@ -127,7 +131,7 @@ class ExchangeServiceImpl implements ExchangeService {
     return banks.filter(b =>
       b.name.toLowerCase().includes(lowerQuery) ||
       b.code.includes(lowerQuery) ||
-      b.slug.includes(lowerQuery)
+      (b.slug || '').includes(lowerQuery)
     );
   }
 
@@ -157,9 +161,9 @@ class ExchangeServiceImpl implements ExchangeService {
 
     switch (kycLevel) {
       case 'FULL':
-        return settings?.maxTradeNgnDailyFull || env.MAX_TRADE_NGN_DAILY_FULL;
+        return Number(settings?.maxTradeNgnDailyFull ?? env.MAX_TRADE_NGN_DAILY_FULL);
       case 'BASIC':
-        return settings?.maxTradeNgnDailyBasic || env.MAX_TRADE_NGN_DAILY_BASIC;
+        return Number(settings?.maxTradeNgnDailyBasic ?? env.MAX_TRADE_NGN_DAILY_BASIC);
       default:
         return env.MIN_TRADE_NGN;
     }

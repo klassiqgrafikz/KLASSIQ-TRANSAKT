@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@klassiq-transakt/db';
 import { redirect } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardContent } from '@klassiq-transakt/ui/components/Card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@klassiq-transakt/ui/components/Card';
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Badge } from '@klassiq-transakt/ui/components/Badge';
 import { formatNgn, formatBtc, formatRelativeTime } from '@klassiq-transakt/ui/lib/utils';

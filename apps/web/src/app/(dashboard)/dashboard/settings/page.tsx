@@ -7,7 +7,7 @@ import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@klassiq-transakt/ui/components/Card';
 import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { formatRelativeTime, cn } from '@klassiq-transakt/ui/lib/utils';
-import { User, Mail, Lock, Shield, Bell, Key, Trash2, Loader2, CheckCircle, AlertCircle, Monitor } from 'lucide-react';
+import { User, Mail, Lock, Shield, Bell, Key, Trash2, Loader2, CheckCircle, AlertCircle, Monitor, Plus } from 'lucide-react';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'api' | 'danger'>('profile');
@@ -181,7 +181,8 @@ export default function SettingsPage() {
                   {security.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
                 </Button>
               </div>
-            </CardContent          </Card>
+            </CardContent>
+          </Card>
 
           <Card className="border-destructive">
             <CardHeader>

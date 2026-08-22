@@ -1,11 +1,12 @@
 import { prisma } from '@klassiq-transakt/db';
 import { exchangeService } from '@klassiq-transakt/exchange';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { Metadata } from 'next';
 import { formatNgn, formatBtc } from '@klassiq-transakt/ui/lib/utils';
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
-import { QRCode, Bitcoin, DollarSign, Clock, Copy, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { QrCode, Bitcoin, DollarSign, Clock, Copy, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 
 interface PaymentLinkData {
   id: string;

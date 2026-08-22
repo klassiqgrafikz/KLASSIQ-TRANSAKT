@@ -68,7 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        token.id = user.id;
+        token.id = user.id ?? token.sub ?? '';
         token.role = user.role;
         token.kycLevel = user.kycLevel;
         token.status = user.status;
@@ -106,6 +106,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   events: {
     async signIn({ user }) {
+      if (!user.id) return;
       await prisma.auditLog.create({
         data: {
           userId: user.id,
@@ -131,6 +132,7 @@ declare module 'next-auth' {
       id: string;
       email: string;
       name?: string | null;
+      image?: string | null;
       role: string;
       kycLevel: string;
       status: string;
@@ -138,7 +140,7 @@ declare module 'next-auth' {
   }
 }
 
-declare module 'next-auth/jwt' {
+declare module '@auth/core/jwt' {
   interface JWT {
     id: string;
     role: string;

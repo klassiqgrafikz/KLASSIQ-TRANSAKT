@@ -5,6 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@klassiq-transakt/ui/c
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Badge } from '@klassiq-transakt/ui/components/Badge';
 import { Input } from '@klassiq-transakt/ui/components/Input';
+import { Label } from '@klassiq-transakt/ui/components/Label';
+import { Select, SelectOption } from '@klassiq-transakt/ui/components/Select';
 import { formatRelativeTime } from '@klassiq-transakt/ui/lib/utils';
 import { Plus, Search, Mail, User, Shield, Loader2, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -35,7 +37,7 @@ async function getUsers(page = 1, search = '', status = '', role = '') {
         role: true,
         kycLevel: true,
         createdAt: true,
-        _count: { select: { transactions: true, bankAccounts: true } },
+        _count: { select: { transactions: true, accounts: true } },
       },
     }),
     prisma.user.count({ where }),
@@ -154,7 +156,7 @@ export default async function AdminUsersPage({
                       </Badge>
                     </td>
                     <td className="px-4 py-4 text-sm text-muted-foreground">
-                      {user._count.transactions} txns • {user._count.bankAccounts} banks
+                      {user._count.transactions} txns • {user._count.accounts} banks
                     </td>
                     <td className="px-4 py-4 text-sm text-muted-foreground">
                       {formatRelativeTime(user.createdAt)}

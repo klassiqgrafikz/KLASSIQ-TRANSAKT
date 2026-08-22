@@ -3,7 +3,6 @@ import { prisma } from '@klassiq-transakt/db';
 import { exchangeService } from '@klassiq-transakt/exchange';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
 
 const createLinkSchema = z.object({
   title: z.string().min(1).max(100),
