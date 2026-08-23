@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const QuidaxWebhookSchema = z.object({
@@ -171,19 +171,77 @@ export class QuidaxAdapter implements ExchangeAdapter {
     });
   }
 
-  async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {
-    const currency = 'BTC';
-    const response = await this.client.post('/users/me/addresses', {
-      currency,
-      network: network === Network.LIGHTNING ? 'lightning' : 'bitcoin',
+  // ── Wallets ───────────────────────────────────────────────────────
+
+  async getWallets(): Promise<WalletBalance[]> {
+    const response = await this.client.get('/users/me/accounts');
+    const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
+    return rows.map(w => ({
+      currency: String(w.currency ?? '').toLowerCase(),
+      balance: parseFloat(String(w.balance ?? '0')) || 0,
+      locked: parseFloat(String(w.locked ?? '0')) || 0,
+      staked: parseFloat(String(w.staked ?? '0')) || 0,
+      isCrypto: Boolean(w.is_crypto),
+      convertedNgn: parseFloat(String(w.converted_balance ?? '0')) || 0,
+    }));
+  }
+
+  async getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo> {
+    const c = currency.toLowerCase();
+    const response = await this.client.get(`/users/me/wallets/${c}/address`);
+    const d = response.data?.data ?? {};
+    return {
+      id: String(d.id ?? ''),
+      currency: String(d.currency ?? c).toLowerCase(),
+      address: String(d.address ?? ''),
+      network: (d.network as string | null) ?? null,
+      destinationTag: (d.destination_tag as string | null) ?? null,
+    };
+  }
+
+  async getDepositAddresses(currency: string): Promise<DepositAddressInfo[]> {
+    const c = currency.toLowerCase();
+    const response = await this.client.get(`/users/me/wallets/${c}/addresses`);
+    const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
+    return rows.map(d => ({
+      id: String(d.id ?? ''),
+      currency: String(d.currency ?? c).toLowerCase(),
+      address: String(d.address ?? ''),
+      network: (d.network as string | null) ?? null,
+      destinationTag: (d.destination_tag as string | null) ?? null,
+    }));
+  }
+
+  async createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo> {
+    const c = currency.toLowerCase();
+    const response = await this.client.post(`/users/me/wallets/${c}/addresses`, null, {
+      params: network ? { network } : undefined,
+    });
+    const d = response.data?.data ?? {};
+    // Generation is async — address may be null until wallet.address.generated fires
+    return {
+      id: String(d.id ?? ''),
+      currency: String(d.currency ?? c).toLowerCase(),
+      address: String(d.address ?? ''),
+      network: (d.network as string | null) ?? network ?? null,
+      destinationTag: (d.destination_tag as string | null) ?? null,
+    };
+  }
+
+  async withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal> {
+    const response = await this.client.post('/users/me/withdraws', {
+      currency: input.currency.toLowerCase(),
+      amount: String(input.amount),
+      fund_uid: input.address,
+      ...(input.network ? { network: input.network } : {}),
+      reference: input.reference,
+      narration: 'KLASSIQ TRANSAKT withdrawal',
     });
 
-    const data = response.data.data;
-    return {
-      address: data.address,
-      network,
-      depositId: data.id,
-    };
+    if (response.data?.status !== 'success') {
+      throw new Error(`Crypto withdrawal failed: ${response.data?.message ?? 'unknown'}`);
+    }
+    return this.mapWithdrawal(response.data.data);
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

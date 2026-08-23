@@ -81,6 +81,31 @@ export interface PlaceOrderInput {
   price?: number;        // required for limit
 }
 
+export interface WalletBalance {
+  currency: string;
+  balance: number;
+  locked: number;
+  staked?: number;
+  isCrypto: boolean;
+  convertedNgn: number;
+}
+
+export interface DepositAddressInfo {
+  id: string;
+  currency: string;
+  address: string;
+  network?: string | null;
+  destinationTag?: string | null;
+}
+
+export interface WithdrawCryptoInput {
+  currency: string;      // e.g. 'btc', 'usdt'
+  amount: number;
+  address: string;
+  network?: string;      // required by some chains
+  reference: string;
+}
+
 export interface DepositAddress {
   address: string;
   network: Network;
@@ -150,8 +175,14 @@ export interface ExchangeAdapter {
   cancelOrder(orderId: string): Promise<void>;
   getUserOrders(market?: string, limit?: number): Promise<UserOrder[]>;
 
+  // Wallets
+  getWallets(): Promise<WalletBalance[]>;
+  getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo>;
+  getDepositAddresses(currency: string): Promise<DepositAddressInfo[]>;
+  createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo>;
+  withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal>;
+
   // Deposits (Receiving BTC)
-  createDepositAddress(network: Network, amount?: number): Promise<DepositAddress>;
   getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }>;
 
   // Trading (Sell BTC -> NGN)
@@ -189,7 +220,6 @@ export interface ExchangeService {
   getRate(fromCurrency: string, toCurrency: string): Promise<RateQuote>;
   getAllTickers(): Promise<MarketTicker[]>;
   getTicker(market: string): Promise<MarketTicker>;
-  createDepositAddress(network: Network, amount?: number): Promise<DepositAddress>;
   sellBtc(btcAmount: number): Promise<SellOrder>;
   withdrawNgn(params: WithdrawalParams): Promise<Withdrawal>;
   getBanks(): Promise<Bank[]>;

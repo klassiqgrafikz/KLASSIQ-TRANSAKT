@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const YellowCardWebhookSchema = z.object({
@@ -82,22 +82,24 @@ export class YellowCardAdapter implements ExchangeAdapter {
     throw new Error(`getUserOrders not supported by ${this.provider}`);
   }
 
-  async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {
-    const currency = network === Network.LIGHTNING ? 'BTC' : 'BTC';
-    const response = await this.client.post('/api/v1/deposit-address', {
-      currency,
-      network: network === Network.LIGHTNING ? 'lightning' : 'bitcoin',
-      amount,
-    });
+  async getWallets(): Promise<WalletBalance[]> {
+    throw new Error(`getWallets not supported by ${this.provider}`);
+  }
 
-    const data = response.data.data;
-    return {
-      address: data.address,
-      network,
-      qrCode: data.qr_code,
-      depositId: data.id,
-      expiresAt: data.expires_at ? new Date(data.expires_at) : undefined,
-    };
+  async getDefaultDepositAddress(_currency: string): Promise<DepositAddressInfo> {
+    throw new Error(`deposit addresses not supported by ${this.provider}`);
+  }
+
+  async getDepositAddresses(_currency: string): Promise<DepositAddressInfo[]> {
+    throw new Error(`deposit addresses not supported by ${this.provider}`);
+  }
+
+  async createDepositAddress(_currency: string, _network?: string): Promise<DepositAddressInfo> {
+    throw new Error(`deposit address generation not supported by ${this.provider}`);
+  }
+
+  async withdrawCrypto(_input: WithdrawCryptoInput): Promise<Withdrawal> {
+    throw new Error(`crypto withdrawals not supported by ${this.provider}`);
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

@@ -1,4 +1,4 @@
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker, WalletBalance, DepositAddressInfo, WithdrawCryptoInput, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
 import { YellowCardAdapter } from './yellowcard';
 import { QuidaxAdapter } from './quidax';
 import { env } from '@klassiq-transakt/config';
@@ -82,8 +82,25 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.withFallback(adapter => adapter.getUserOrders(market, limit));
   }
 
-  async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {
-    return this.withFallback(adapter => adapter.createDepositAddress(network, amount));
+  // ── Wallets (Quidax capability) ──────────────────────────────────
+  async getWallets(): Promise<WalletBalance[]> {
+    return this.quidaxAdapter.getWallets();
+  }
+
+  async getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo> {
+    return this.quidaxAdapter.getDefaultDepositAddress(currency);
+  }
+
+  async getDepositAddresses(currency: string): Promise<DepositAddressInfo[]> {
+    return this.quidaxAdapter.getDepositAddresses(currency);
+  }
+
+  async createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo> {
+    return this.quidaxAdapter.createDepositAddress(currency, network);
+  }
+
+  async withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal> {
+    return this.quidaxAdapter.withdrawCrypto(input);
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

@@ -30,8 +30,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
-    // Create deposit address on exchange
-    const deposit = await exchangeService.createDepositAddress(network, btcAmount);
+    // Use the user's default on-chain BTC deposit address from Quidax
+    const addrInfo = await exchangeService.getDefaultDepositAddress('btc');
+    const deposit = {
+      address: addrInfo.address,
+      network: network as string,
+      qrCode: undefined as string | undefined,
+      depositId: addrInfo.id,
+      expiresAt: undefined as Date | undefined,
+    };
 
     // Create transaction record
     const transaction = await prisma.transaction.create({
