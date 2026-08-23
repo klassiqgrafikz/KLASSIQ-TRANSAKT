@@ -31,6 +31,20 @@ export interface Bank {
   logoUrl?: string;
 }
 
+export interface MarketTicker {
+  market: string;        // e.g. 'btcngn'
+  base: string;          // e.g. 'btc'
+  quote: string;         // e.g. 'ngn'
+  last: number;
+  bid?: number;
+  ask?: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;        // base-unit 24h volume
+  changePct: number;     // computed vs open
+}
+
 export interface DepositAddress {
   address: string;
   network: Network;
@@ -89,6 +103,8 @@ export interface ExchangeAdapter {
   // Rate & Market Data
   getRate(fromCurrency: string, toCurrency: string): Promise<RateQuote>;
   getMarketPrice(base: string, quote: string): Promise<number>;
+  getAllTickers(): Promise<MarketTicker[]>;
+  getTicker(market: string): Promise<MarketTicker>;
 
   // Deposits (Receiving BTC)
   createDepositAddress(network: Network, amount?: number): Promise<DepositAddress>;
@@ -127,6 +143,8 @@ export interface ExchangeAdapter {
 
 export interface ExchangeService {
   getRate(fromCurrency: string, toCurrency: string): Promise<RateQuote>;
+  getAllTickers(): Promise<MarketTicker[]>;
+  getTicker(market: string): Promise<MarketTicker>;
   createDepositAddress(network: Network, amount?: number): Promise<DepositAddress>;
   sellBtc(btcAmount: number): Promise<SellOrder>;
   withdrawNgn(params: WithdrawalParams): Promise<Withdrawal>;

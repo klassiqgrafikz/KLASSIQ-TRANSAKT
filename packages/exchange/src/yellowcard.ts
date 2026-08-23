@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const YellowCardWebhookSchema = z.object({
@@ -45,6 +45,15 @@ export class YellowCardAdapter implements ExchangeAdapter {
   async getMarketPrice(base: string, quote: string): Promise<number> {
     const quoteResponse = await this.getRate(base, quote);
     return quoteResponse.rate;
+  }
+
+  async getTicker(market: string): Promise<MarketTicker> {
+    // Yellow Card has no multi-pair ticker concept — unsupported until needed.
+    throw new Error(`getTicker not supported by ${this.provider}`);
+  }
+
+  async getAllTickers(): Promise<MarketTicker[]> {
+    throw new Error(`getAllTickers not supported by ${this.provider}`);
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {

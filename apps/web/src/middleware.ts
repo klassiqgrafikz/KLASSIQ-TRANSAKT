@@ -22,9 +22,13 @@ export default auth((req) => {
 
   // Allow public paths
   if (isPublicPath) {
+    // Logged-in users skip marketing pages and go straight to the terminal
+    if (isLoggedIn && nextUrl.pathname === '/') {
+      return NextResponse.redirect(new URL('/markets', nextUrl));
+    }
     // Redirect logged-in users away from login page
     if (isLoggedIn && nextUrl.pathname === '/auth/login') {
-      return NextResponse.redirect(new URL('/dashboard', nextUrl));
+      return NextResponse.redirect(new URL('/markets', nextUrl));
     }
     return NextResponse.next();
   }

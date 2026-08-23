@@ -1,4 +1,4 @@
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker } from './types';
 import { YellowCardAdapter } from './yellowcard';
 import { QuidaxAdapter } from './quidax';
 import { env } from '@klassiq-transakt/config';
@@ -13,6 +13,11 @@ class ExchangeServiceImpl implements ExchangeService {
   constructor() {
     this.primary = new YellowCardAdapter();
     this.fallback = new QuidaxAdapter();
+  }
+
+  /** Market-data feeds live on Quidax regardless of active trade provider. */
+  private get quidaxAdapter(): QuidaxAdapter {
+    return this.fallback as QuidaxAdapter;
   }
 
   private getActiveAdapter(): ExchangeAdapter {
@@ -41,6 +46,16 @@ class ExchangeServiceImpl implements ExchangeService {
 
   async getRate(fromCurrency: string, toCurrency: string): Promise<RateQuote> {
     return this.withFallback(adapter => adapter.getRate(fromCurrency, toCurrency));
+  }
+
+  async getAllTickers(): Promise<MarketTicker[]> {
+    // Ticker/market-data feeds are a Quidax capability — always route there
+    // regardless of which provider handles trades.
+    return this.quidaxAdapter.getAllTickers();
+  }
+
+  async getTicker(market: string): Promise<MarketTicker> {
+    return this.quidaxAdapter.getTicker(market);
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {

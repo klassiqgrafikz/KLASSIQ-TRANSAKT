@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const QuidaxWebhookSchema = z.object({
@@ -44,6 +44,41 @@ export class QuidaxAdapter implements ExchangeAdapter {
   async getMarketPrice(base: string, quote: string): Promise<number> {
     const quoteResponse = await this.getRate(base, quote);
     return quoteResponse.rate;
+  }
+
+  private mapTicker(market: string, t: { last?: unknown; buy?: unknown; sell?: unknown; high?: unknown; low?: unknown; open?: unknown; vol?: unknown }): MarketTicker {
+    const num = (v: unknown) => parseFloat(String(v ?? '0')) || 0;
+    const [baseUnit, ...rest] = market.split(/(?=ngn|usdt|ghs|usd|xaf|xof|zar|kes|btc$)/i);
+    const open = num(t.open);
+    const last = num(t.last);
+    return {
+      market,
+      base: baseUnit || market,
+      quote: rest.join('') || '',
+      last,
+      bid: num(t.buy) || undefined,
+      ask: num(t.sell) || undefined,
+      open,
+      high: num(t.high),
+      low: num(t.low),
+      volume: num(t.vol),
+      changePct: open > 0 ? Number((((last - open) / open) * 100).toFixed(2)) : 0,
+    };
+  }
+
+  async getTicker(market: string): Promise<MarketTicker> {
+    const response = await this.client.get(`/markets/tickers/${market.toLowerCase()}`);
+    const payload = response.data?.data?.[market.toLowerCase()]?.ticker;
+    if (!payload) throw new Error(`No ticker for market ${market}`);
+    return this.mapTicker(market.toLowerCase(), payload);
+  }
+
+  async getAllTickers(): Promise<MarketTicker[]> {
+    const response = await this.client.get('/markets/tickers');
+    const data = (response.data?.data ?? {}) as Record<string, { ticker?: Record<string, unknown> }>;
+    return Object.entries(data)
+      .filter(([, v]) => v?.ticker)
+      .map(([market, v]) => this.mapTicker(market, v.ticker as never));
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {
