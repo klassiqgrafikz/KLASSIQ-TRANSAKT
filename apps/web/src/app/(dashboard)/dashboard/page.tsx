@@ -73,9 +73,48 @@ export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id;
 
-  if (!userId) return null;
+  let data: Awaited<ReturnType<typeof getDashboardData>> | null = null;
+  let loadError: string | null = null;
 
-  const data = await getDashboardData(userId);
+  try {
+    data = userId ? await getDashboardData(userId) : null;
+  } catch (err) {
+    loadError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error('[Dashboard] data load failed:', err);
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className="max-w-2xl mx-auto py-10">
+        <Card className="border-red-300">
+          <CardHeader>
+            <CardTitle className="text-destructive">Dashboard failed to load</CardTitle>
+            <CardDescription>
+              This is a temporary diagnostics view. The error below shows the real cause.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <pre className="p-4 rounded-lg bg-muted text-sm whitespace-pre-wrap break-words font-mono">
+              {loadError ?? 'No session — try logging in again.'}
+            </pre>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>Common causes:</p>
+              <ul className="list-disc list-inside">
+                <li><code>P1012 / Environment variable not found: DATABASE_URL</code> → add it in Vercel env vars</li>
+                <li><code>Query engine ... could not be found</code> → platform/engine mismatch (report to dev)</li>
+                <li><code>Can&apos;t reach database server</code> → Supabase pausing/network — retry</li>
+              </ul>
+              <p className="pt-2">
+                Also check <a className="underline" href="/api/health" target="_blank">/api/health</a> and Vercel → Deployments → Functions logs.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!userId) return null;
 
   return (
     <div className="space-y-6">
