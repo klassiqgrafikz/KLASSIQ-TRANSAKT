@@ -53,3 +53,9 @@ desktop.ini
 *.pem
 *.keyapps/web/.admin-credentials.txt
 .admin-credentials.txt
+
+jar*.txt
+*-response.txt
+csrf.json
+session.json
+dashboard.html
