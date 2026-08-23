@@ -174,7 +174,7 @@ export class QuidaxAdapter implements ExchangeAdapter {
   // ── Wallets ───────────────────────────────────────────────────────
 
   async getWallets(): Promise<WalletBalance[]> {
-    const response = await this.client.get('/users/me/accounts');
+    const response = await this.client.get('/users/me/wallets');
     const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
     return rows.map(w => ({
       currency: String(w.currency ?? '').toLowerCase(),
