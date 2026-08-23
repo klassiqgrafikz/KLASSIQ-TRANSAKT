@@ -8,7 +8,8 @@ import { env } from '@klassiq-transakt/config';
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  // Owner chose a 4-digit PIN for single-user access; invited users still sign up with 8+ chars.
+  password: z.string().min(4),
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
