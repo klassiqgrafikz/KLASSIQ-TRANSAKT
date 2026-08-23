@@ -1,4 +1,4 @@
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
 import { YellowCardAdapter } from './yellowcard';
 import { QuidaxAdapter } from './quidax';
 import { env } from '@klassiq-transakt/config';
@@ -56,6 +56,30 @@ class ExchangeServiceImpl implements ExchangeService {
 
   async getTicker(market: string): Promise<MarketTicker> {
     return this.quidaxAdapter.getTicker(market);
+  }
+
+  async getDepth(market: string, limit = 20): Promise<DepthSnapshot> {
+    return this.quidaxAdapter.getDepth(market, limit);
+  }
+
+  async getKlines(market: string, period: number, limit = 200): Promise<Kline[]> {
+    return this.quidaxAdapter.getKlines(market, period, limit);
+  }
+
+  async getMarketTrades(market: string, limit = 30): Promise<MarketTrade[]> {
+    return this.quidaxAdapter.getMarketTrades(market, limit);
+  }
+
+  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
+    return this.withFallback(adapter => adapter.placeOrder(input));
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    return this.withFallback(adapter => adapter.cancelOrder(orderId));
+  }
+
+  async getUserOrders(market?: string, limit = 100): Promise<UserOrder[]> {
+    return this.withFallback(adapter => adapter.getUserOrders(market, limit));
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {

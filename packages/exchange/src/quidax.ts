@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const QuidaxWebhookSchema = z.object({
@@ -79,6 +79,96 @@ export class QuidaxAdapter implements ExchangeAdapter {
     return Object.entries(data)
       .filter(([, v]) => v?.ticker)
       .map(([market, v]) => this.mapTicker(market, v.ticker as never));
+  }
+
+  async getDepth(market: string, limit = 20): Promise<DepthSnapshot> {
+    const m = market.toLowerCase();
+    const response = await this.client.get(`/markets/${m}/depth`, { params: { limit } });
+    const d = response.data?.data ?? {};
+    // Quidax returns both sides sorted high→low; normalize: asks ascending, bids descending
+    const toLevels = (arr: unknown): DepthLevel[] =>
+      Array.isArray(arr)
+        ? arr
+            .map((row) => ({ price: Number(row?.[0] ?? 0), volume: Number(row?.[1] ?? 0) }))
+            .filter(l => l.price > 0 && l.volume > 0)
+        : [];
+    const asks = toLevels(d.asks).sort((a, b) => a.price - b.price);
+    const bids = toLevels(d.bids).sort((a, b) => b.price - a.price);
+    return { asks, bids, timestamp: Number(d.timestamp ?? Date.now()) };
+  }
+
+  async getKlines(market: string, period: number, limit = 200): Promise<Kline[]> {
+    const m = market.toLowerCase();
+    const response = await this.client.get(`/markets/${m}/k`, { params: { period, limit } });
+    const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as unknown[][];
+    return rows.map(r => [Number(r[0]), Number(r[1]), Number(r[2]), Number(r[3]), Number(r[4]), Number(r[5] ?? 0)] as Kline);
+  }
+
+  async getMarketTrades(market: string, limit = 30): Promise<MarketTrade[]> {
+    const m = market.toLowerCase();
+    try {
+      const response = await this.client.get(`/markets/${m}/trades`, { params: { limit } });
+      const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
+      return rows.map(r => ({
+        id: (r.tid ?? r.id ?? Math.random()) as string | number,
+        side: (String(r.type ?? r.side ?? 'buy').toLowerCase() === 'sell' ? 'sell' : 'buy'),
+        price: Number(r.price ?? 0),
+        amount: Number(r.amount ?? 0),
+        createdAt: Number(r.date ?? r.created_at ?? 0),
+      }));
+    } catch {
+      return []; // feed optional — terminal works without it
+    }
+  }
+
+  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
+    const body: Record<string, unknown> = {
+      market: input.market.toLowerCase(),
+      side: input.side,
+      ord_type: input.type,
+      volume: String(input.volume),
+    };
+    if (input.type === 'limit') {
+      if (!input.price || input.price <= 0) throw new Error('Limit orders require a positive price');
+      body.price = String(input.price);
+    }
+    const response = await this.client.post('/users/me/orders', body);
+    if (response.data?.status !== 'success') {
+      throw new Error(`Order rejected: ${response.data?.message ?? 'unknown'}`);
+    }
+    return this.mapSellOrder(response.data.data);
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    const response = await this.client.post(`/users/me/orders/${orderId}/cancel`);
+    if (response.data?.status && response.data.status !== 'success') {
+      throw new Error(`Cancel failed: ${response.data.message ?? 'unknown'}`);
+    }
+  }
+
+  private static readonly OPEN_STATES = new Set(['wait', 'new', 'new_', 'pending', 'partially', 'partial']);
+
+  async getUserOrders(market?: string, limit = 100): Promise<UserOrder[]> {
+    const response = await this.client.get('/users/me/orders', {
+      params: { ...(market ? { market: market.toLowerCase() } : {}), limit },
+    });
+    const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
+    return rows.map(r => {
+      const state = String(r.state ?? '').toLowerCase();
+      return {
+        id: String(r.id ?? ''),
+        market: String(r.market ?? r.currency ?? ''),
+        side: (String(r.side ?? '').toLowerCase() === 'sell' ? 'sell' : 'buy'),
+        type: (String(r.ord_type ?? 'limit').toLowerCase() === 'market' ? 'market' : 'limit'),
+        price: parseFloat(String(r.price ?? '0')) || 0,
+        avgPrice: parseFloat(String(r.avg_price ?? '0')) || 0,
+        originVolume: parseFloat(String(r.origin_volume ?? r.volume ?? '0')) || 0,
+        executedVolume: parseFloat(String(r.executed_volume ?? '0')) || 0,
+        state,
+        open: QuidaxAdapter.OPEN_STATES.has(state),
+        createdAt: new Date(String(r.created_at ?? Date.now())),
+      };
+    });
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {

@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const YellowCardWebhookSchema = z.object({
@@ -54,6 +54,32 @@ export class YellowCardAdapter implements ExchangeAdapter {
 
   async getAllTickers(): Promise<MarketTicker[]> {
     throw new Error(`getAllTickers not supported by ${this.provider}`);
+  }
+
+  async getDepth(_market: string, _limit?: number): Promise<DepthSnapshot> {
+    throw new Error(`getDepth not supported by ${this.provider}`);
+  }
+
+  async getKlines(_market: string, _period: number, _limit?: number): Promise<Kline[]> {
+    throw new Error(`getKlines not supported by ${this.provider}`);
+  }
+
+  async getMarketTrades(_market: string, _limit?: number): Promise<MarketTrade[]> {
+    throw new Error(`getMarketTrades not supported by ${this.provider}`);
+  }
+
+  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
+    // Yellow Card sell flow differs; route via existing createMarketSell for market side.
+    if (input.type === 'market' && input.side === 'sell') return this.createMarketSell(input.volume);
+    throw new Error(`placeOrder (${input.type}/${input.side}) not supported by ${this.provider} yet`);
+  }
+
+  async cancelOrder(_orderId: string): Promise<void> {
+    throw new Error(`cancelOrder not supported by ${this.provider}`);
+  }
+
+  async getUserOrders(_market?: string, _limit?: number): Promise<UserOrder[]> {
+    throw new Error(`getUserOrders not supported by ${this.provider}`);
   }
 
   async createDepositAddress(network: Network, amount?: number): Promise<DepositAddress> {

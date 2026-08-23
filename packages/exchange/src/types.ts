@@ -45,6 +45,42 @@ export interface MarketTicker {
   changePct: number;     // computed vs open
 }
 
+export interface DepthLevel { price: number; volume: number; }
+export interface DepthSnapshot { asks: DepthLevel[]; bids: DepthLevel[]; timestamp: number; }
+
+/** [timeSec, open, high, low, close, baseVolume] */
+export type Kline = [number, number, number, number, number, number];
+
+export interface MarketTrade {
+  id: string | number;
+  side: 'buy' | 'sell';
+  price: number;
+  amount: number;
+  createdAt: number; // epoch seconds
+}
+
+export interface UserOrder {
+  id: string;
+  market: string;
+  side: 'buy' | 'sell';
+  type: 'limit' | 'market';
+  price: number;
+  avgPrice: number;
+  originVolume: number;
+  executedVolume: number;
+  state: string;          // raw provider state
+  open: boolean;          // normalized
+  createdAt: Date;
+}
+
+export interface PlaceOrderInput {
+  market: string;
+  side: 'buy' | 'sell';
+  type: 'limit' | 'market';
+  volume: number;
+  price?: number;        // required for limit
+}
+
 export interface DepositAddress {
   address: string;
   network: Network;
@@ -105,6 +141,14 @@ export interface ExchangeAdapter {
   getMarketPrice(base: string, quote: string): Promise<number>;
   getAllTickers(): Promise<MarketTicker[]>;
   getTicker(market: string): Promise<MarketTicker>;
+  getDepth(market: string, limit?: number): Promise<DepthSnapshot>;
+  getKlines(market: string, period: number, limit?: number): Promise<Kline[]>;
+  getMarketTrades(market: string, limit?: number): Promise<MarketTrade[]>;
+
+  // Trading
+  placeOrder(input: PlaceOrderInput): Promise<SellOrder>;
+  cancelOrder(orderId: string): Promise<void>;
+  getUserOrders(market?: string, limit?: number): Promise<UserOrder[]>;
 
   // Deposits (Receiving BTC)
   createDepositAddress(network: Network, amount?: number): Promise<DepositAddress>;
