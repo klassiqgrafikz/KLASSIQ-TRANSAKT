@@ -51,6 +51,12 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.withFallback(adapter => adapter.getDepositStatus(depositId));
   }
 
+  async sellBtcWithFill(btcAmount: number): Promise<SellOrder> {
+    const order = await this.sellBtc(btcAmount);
+    if (order.status === TxnStatus.COMPLETED) return order;
+    return this.withFallback(adapter => adapter.pollOrderUntilDone(order.providerOrderId));
+  }
+
   async sellBtc(btcAmount: number): Promise<SellOrder> {
     return this.withFallback(adapter => adapter.createMarketSell(btcAmount));
   }
