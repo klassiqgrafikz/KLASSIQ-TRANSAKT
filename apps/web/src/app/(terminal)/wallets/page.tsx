@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Input } from '@klassiq-transakt/ui/components/Input';
 import { Label } from '@klassiq-transakt/ui/components/Label';
@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@klassiq-transakt/ui/compon
 import { cn, formatNgn } from '@klassiq-transakt/ui/lib/utils';
 import {
   Wallet as WalletIcon, Copy, CheckCircle2, Loader2, ArrowDownToLine,
-  ArrowUpFromLine, Zap, RefreshCw, Info,
+  ArrowUpFromLine, Zap, RefreshCw, Info, ExternalLink,
 } from 'lucide-react';
 
 interface WalletRow {
@@ -59,6 +59,19 @@ export default function WalletsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Always surface core coins (so Deposit is reachable pre-funding), merged with live balances
+  const displayRows = useMemo(() => {
+    const CORE = ['btc', 'usdt', 'eth'];
+    const map = new Map<string, WalletRow>();
+    CORE.forEach(c => map.set(c, { currency: c, balance: 0, locked: 0, isCrypto: true, convertedNgn: 0 }));
+    wallets.forEach(w => {
+      map.set(w.currency, w); // live data wins
+    });
+    return [...map.values()].sort((a, b) =>
+      (b.convertedNgn - a.convertedNgn) || (b.balance - a.balance)
+    );
+  }, [wallets]);
 
   return (
     <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -128,12 +141,7 @@ export default function WalletsPage() {
                   ))}
                 </tr>
               ))
-            ) : wallets.filter(w => w.balance > 0 || w.locked > 0).length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                No funded wallets yet — deposit BTC or buy on the terminal first.
-              </td></tr>
-            ) : (
-              wallets.filter(w => w.balance > 0 || w.locked > 0).map(w => (
+            ) : displayRows.map(w => (
                 <tr key={w.currency} className="border-b border-border/50 hover:bg-accent/40 transition-colors">
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
@@ -166,8 +174,7 @@ export default function WalletsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
@@ -439,19 +446,20 @@ function NgnWithdrawModal({ onClose, onDone }: { onClose: () => void; onDone: ()
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/banks/my-accounts');
-        if (res.ok) {
-          const list = await res.json();
-          setAccounts(list);
-          const def = list.find((a: any) => a.isDefault) ?? list[0];
-          if (def) setAccountId(def.id);
-        }
-      } finally { setLoading(false); }
-    })();
+  const loadAccounts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/banks/my-accounts');
+      if (res.ok) {
+        const list = await res.json();
+        setAccounts(list);
+        const def = list.find((a: { isDefault?: boolean }) => a.isDefault) ?? list[0];
+        if (def) setAccountId(def.id);
+      }
+    } finally { setLoading(false); }
   }, []);
+
+  useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
   const submit = async () => {
     const amt = parseFloat(amount) || 0;
@@ -488,10 +496,20 @@ function NgnWithdrawModal({ onClose, onDone }: { onClose: () => void; onDone: ()
           <div className="py-8 flex justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : accounts.length === 0 ? (
           <div className="space-y-4 text-center py-4">
-            <p className="text-sm text-muted-foreground">No bank accounts yet.</p>
-            <Button onClick={onClose} variant="outline" className="w-full">
-              Add one under Classic → Bank Accounts
-            </Button>
+            <p className="text-sm text-muted-foreground">No bank accounts linked yet.</p>
+            <div className="flex flex-col gap-2">
+              <a
+                href="/dashboard/accounts"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Add Bank Account <ExternalLink className="h-4 w-4" />
+              </a>
+              <Button variant="outline" className="w-full" onClick={loadAccounts} loading={loading}>
+                I've added it — Recheck
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
