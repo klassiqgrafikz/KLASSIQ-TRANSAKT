@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
-  Bitcoin, LayoutGrid, CandlestickChart, Wallet, ArrowLeftRight,
+  Bitcoin, LayoutGrid, LayoutDashboard, CandlestickChart, Wallet, ArrowLeftRight,
   Link2, Shield, Settings, Menu, X, LogOut, ChevronDown, History, CreditCard,
 } from 'lucide-react';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
@@ -13,9 +13,9 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@klassiq-transakt/ui/components/DropdownMenu';
-import NetworkRotator from './NetworkRotator';
 
 const nav = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Markets', href: '/markets', icon: LayoutGrid },
   { name: 'Trade', href: '/trade/btcngn', icon: CandlestickChart, match: '/trade' },
   { name: 'Wallets', href: '/wallets', icon: Wallet },
@@ -80,11 +80,8 @@ export default function TerminalShell({
           ))}
         </nav>
 
-        {/* Right zone: rotating ticker + user */}
+        {/* Right zone: user */}
         <div className="ml-auto flex items-center gap-3 shrink-0">
-          <div className="hidden sm:block">
-            <NetworkRotator />
-          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50">
@@ -136,10 +133,6 @@ export default function TerminalShell({
                 {item.name}
               </Link>
             ))}
-            {/* Mobile: also show rotator inside drawer for visibility */}
-            <div className="pt-4 sm:hidden">
-              <NetworkRotator />
-            </div>
           </nav>
         </>
       )}
