@@ -48,9 +48,15 @@ export default function TerminalShell({
     : [...mainNav, ...extrasNav];
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div className="min-h-screen text-zinc-900 relative">
+      {/* Background image */}
+      <div
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.04] pointer-events-none"
+        style={{ backgroundImage: 'url(/crypto.png)' }}
+      />
+
       {/* Top bar — light, 56px, two zones */}
-      <header className="fixed top-0 inset-x-0 z-50 h-14 flex items-center gap-3 border-b border-zinc-200 bg-white px-3 shadow-sm">
+      <header className="fixed top-0 inset-x-0 z-50 h-14 flex items-center gap-3 border-b border-zinc-200/80 bg-white/90 backdrop-blur-sm px-3 shadow-sm">
         {/* Left: hamburger + brand + nav tabs */}
         <button
           className="lg:hidden p-1.5 rounded hover:bg-zinc-100"
@@ -218,7 +224,7 @@ export default function TerminalShell({
       )}
 
       {/* Content — no left padding, max-width centered */}
-      <main className="pt-14 min-h-screen">
+      <main className="relative z-10 pt-14 min-h-screen">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
     </div>
