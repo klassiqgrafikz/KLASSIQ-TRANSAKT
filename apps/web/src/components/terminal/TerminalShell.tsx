@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
-  Bitcoin, LayoutGrid, LayoutDashboard, CandlestickChart, Wallet, ArrowLeftRight,
+  Bitcoin, BarChart3, LayoutDashboard, CandlestickChart, Wallet, ArrowLeftRight,
   Link2, Shield, Settings, Menu, X, LogOut, ChevronDown, History, CreditCard,
 } from 'lucide-react';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
@@ -16,7 +16,7 @@ import {
 
 const mainNav = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Markets', href: '/markets', icon: LayoutGrid },
+  { name: 'Markets', href: '/markets', icon: BarChart3 },
   { name: 'Trade', href: '/trade/btcngn', icon: CandlestickChart, match: '/trade' },
   { name: 'Wallets', href: '/wallets', icon: Wallet },
 ];
@@ -65,8 +65,8 @@ export default function TerminalShell({
           <span className="text-sm hidden sm:inline">KLASSIQ TRANSAKT</span>
         </Link>
 
-        {/* Desktop nav tabs — left zone */}
-        <nav className="hidden lg:flex items-center gap-1 ml-4">
+        {/* Desktop nav tabs — spread to fill available space */}
+        <nav className="hidden lg:flex items-center gap-1 ml-4 flex-1 justify-evenly">
           {mainNav.map((item) => (
             <Link
               key={item.name}
