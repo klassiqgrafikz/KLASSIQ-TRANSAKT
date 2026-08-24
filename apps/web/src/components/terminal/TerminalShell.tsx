@@ -51,7 +51,7 @@ export default function TerminalShell({
     <div className="min-h-screen text-zinc-900 relative">
       {/* Background image */}
       <div
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.04] pointer-events-none"
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.3] pointer-events-none"
         style={{ backgroundImage: 'url(/crypto.png)' }}
       />
 
