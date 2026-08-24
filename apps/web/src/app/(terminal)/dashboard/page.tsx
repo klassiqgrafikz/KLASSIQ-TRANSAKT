@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const [totalNgn, setTotalNgn] = useState(0);
   const [wallets, setWallets] = useState<WalletRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [money, setMoney] = useState<{ intent: 'deposit' | 'withdraw' } | null>(null);
 
   const load = useCallback(async () => {
@@ -31,6 +32,7 @@ export default function DashboardPage() {
         setTotalNgn(json.totalNgn ?? 0);
       }
     } catch {}
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -52,7 +54,11 @@ export default function DashboardPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Estimated Total Value</p>
-              <p className="text-2xl md:text-3xl font-bold font-mono tabular-nums mt-0.5">{formatNgn(totalNgn)}</p>
+              {loading ? (
+                <div className="h-9 w-40 mt-1 animate-pulse rounded bg-zinc-100" />
+              ) : (
+                <p className="text-2xl md:text-3xl font-bold font-mono tabular-nums mt-0.5">{formatNgn(totalNgn)}</p>
+              )}
               <p className="text-xs text-zinc-500 mt-1">
                 Balances valued in NGN · <span className="inline-flex items-center gap-1 font-medium text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Auto-Offramp ACTIVE</span>
               </p>
@@ -73,7 +79,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick wallets preview */}
-      {wallets.filter(w => w.balance > 0).length > 0 && (
+      {!loading && wallets.filter(w => w.balance > 0).length > 0 && (
         <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold mb-3">Top Holdings</h2>
           <div className="grid gap-2 sm:grid-cols-3">
