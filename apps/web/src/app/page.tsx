@@ -156,10 +156,10 @@ export default function HomePage() {
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/dashboard/trade" className="hover:text-foreground">Convert BTC → NGN</Link></li>
-                <li><Link href="/dashboard/payment-links" className="hover:text-foreground">Payment Links</Link></li>
-                <li><Link href="/dashboard/api-keys" className="hover:text-foreground">Developer API</Link></li>
-                <li><Link href="/dashboard/rate-alerts" className="hover:text-foreground">Rate Alerts</Link></li>
+                <li><Link href="/convert" className="hover:text-foreground">Convert BTC → NGN</Link></li>
+                <li><Link href="/payment-links" className="hover:text-foreground">Payment Links</Link></li>
+                <li><Link href="/settings" className="hover:text-foreground">Developer API</Link></li>
+                <li><Link href="/markets" className="hover:text-foreground">Rate Alerts</Link></li>
               </ul>
             </div>
             <div>

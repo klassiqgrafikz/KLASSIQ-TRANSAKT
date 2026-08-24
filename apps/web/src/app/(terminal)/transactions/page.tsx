@@ -178,7 +178,7 @@ export default async function TransactionsPage({
                     {transactions.map((txn) => (
                       <TableRow key={txn.id}>
                         <TableCell className="font-mono text-sm">
-                          <Link href={`/dashboard/transactions/${txn.id}`} className="hover:underline">
+                          <Link href={`/transactions/${txn.id}`} className="hover:underline">
                             {txn.id.slice(0, 12)}...
                           </Link>
                         </TableCell>

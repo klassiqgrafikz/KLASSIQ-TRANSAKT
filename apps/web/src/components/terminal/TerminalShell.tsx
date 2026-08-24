@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import {
   Bitcoin, LayoutGrid, CandlestickChart, Wallet, ArrowLeftRight,
-  Link2, Shield, Settings, Menu, X, LogOut, ChevronDown,
+  Link2, Shield, Settings, Menu, X, LogOut, ChevronDown, History, CreditCard,
 } from 'lucide-react';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
 import {
@@ -20,7 +20,10 @@ const nav = [
   { name: 'Trade', href: '/trade/btcngn', icon: CandlestickChart, match: '/trade' },
   { name: 'Wallets', href: '/wallets', icon: Wallet },
   { name: 'Convert', href: '/convert', icon: ArrowLeftRight },
-  { name: 'Payment Links', href: '/dashboard/payment-links', icon: Link2, external: true },
+  { name: 'Payment Links', href: '/payment-links', icon: Link2 },
+  { name: 'Transactions', href: '/transactions', icon: History },
+  { name: 'Bank Accounts', href: '/accounts', icon: CreditCard },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export default function TerminalShell({
@@ -75,8 +78,8 @@ export default function TerminalShell({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings" className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" /> Classic Settings
+                <Link href="/settings" className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" /> Settings
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

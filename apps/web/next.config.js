@@ -10,6 +10,16 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com', 'avatars.githubusercontent.com'],
   },
+  async redirects() {
+    return [
+      { source: '/dashboard', destination: '/markets', permanent: false },
+      { source: '/dashboard/trade', destination: '/convert', permanent: false },
+      { source: '/dashboard/payment-links', destination: '/payment-links', permanent: false },
+      { source: '/dashboard/transactions', destination: '/transactions', permanent: false },
+      { source: '/dashboard/accounts', destination: '/accounts', permanent: false },
+      { source: '/dashboard/settings', destination: '/settings', permanent: false },
+    ];
+  },
   async headers() {
     return [
       {
