@@ -12,7 +12,6 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/dashboard', destination: '/markets', permanent: false },
       { source: '/dashboard/trade', destination: '/convert', permanent: false },
       { source: '/dashboard/payment-links', destination: '/payment-links', permanent: false },
       { source: '/dashboard/transactions', destination: '/transactions', permanent: false },
