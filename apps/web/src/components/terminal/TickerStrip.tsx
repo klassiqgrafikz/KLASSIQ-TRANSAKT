@@ -34,25 +34,28 @@ export default function TickerStrip() {
   }, []);
 
   if (tickers.length === 0) {
-    return <div className="h-6 flex-1 animate-pulse rounded bg-muted/60 mx-2" />;
+    return <div className="h-6 w-[360px] lg:w-[440px] animate-pulse rounded bg-white/10 mx-2 hidden md:block" />;
   }
 
+  const loop = [...tickers, ...tickers];
+
   return (
-    <div className="flex-1 overflow-x-auto no-scrollbar">
-      <div className="flex items-center gap-5 px-2 min-w-max">
-        {tickers.map((t) => (
+    <div className="hidden md:flex w-[360px] lg:w-[440px] overflow-hidden rounded-full bg-white border border-blue-100 shadow-sm shrink-0">
+      <div className="flex animate-marquee whitespace-nowrap will-change-transform">
+        {loop.map((t, i) => (
           <Link
-            key={t.market}
+            key={`${t.market}-${i}`}
             href={`/trade/${t.market}`}
-            className="flex items-center gap-1.5 text-xs whitespace-nowrap hover:opacity-80"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs whitespace-nowrap hover:bg-blue-50"
           >
-            <span className="font-semibold uppercase">{t.base}</span>
-            <span className="font-mono tabular-nums text-muted-foreground">
+            <span className="font-bold uppercase text-slate-900">{t.base}</span>
+            <span className="font-mono tabular-nums text-slate-600">
               ₦{t.last.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
-            <span className={cnChange(t.changePct)}>
+            <span className={t.changePct >= 0 ? 'text-emerald-600' : 'text-red-600'}>
               {t.changePct >= 0 ? '▲' : '▼'} {Math.abs(t.changePct).toFixed(2)}%
             </span>
+            <span className="text-slate-300 mx-1">•</span>
           </Link>
         ))}
       </div>

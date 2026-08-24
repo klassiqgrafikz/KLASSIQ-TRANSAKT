@@ -54,34 +54,33 @@ export default function WalletsPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="mr-auto">
-          <h1 className="text-lg font-bold">Wallets</h1>
-          <p className="text-xs text-muted-foreground">Balances held on your linked Quidax account · valued in NGN</p>
+      {/* Top row: balance + actions grouped left, white/blue accent */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex-1 rounded-xl border border-blue-100 bg-white p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Estimated Total Value</p>
+            <p className="text-3xl font-bold font-mono tabular-nums mt-1 text-slate-900">{formatNgn(totalNgn)}</p>
+            <p className="text-xs text-slate-500 mt-1">Wallets · valued in NGN</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={load} className="p-2.5 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100" title="Refresh">
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            </button>
+            <Button onClick={() => setMoney({ intent: 'deposit' })} size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white">
+              <ArrowDownToLine className="h-4 w-4 mr-1.5" /> Deposit
+            </Button>
+            <Button onClick={() => setMoney({ intent: 'withdraw' })} variant="outline" size="sm" className="h-9 border-blue-200 text-blue-700 hover:bg-blue-50">
+              <ArrowUpFromLine className="h-4 w-4 mr-1.5" /> Withdraw
+            </Button>
+          </div>
         </div>
-        <button onClick={load} className="p-2 rounded-lg border border-border hover:bg-accent" title="Refresh">
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-        </button>
-        <Button onClick={() => setMoney({ intent: 'deposit' })} variant="default" size="sm" className="h-9">
-          <ArrowDownToLine className="h-4 w-4 mr-1.5" /> Deposit
-        </Button>
-        <Button onClick={() => setMoney({ intent: 'withdraw' })} variant="outline" size="sm" className="h-9">
-          <ArrowUpFromLine className="h-4 w-4 mr-1.5" /> Withdraw
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Estimated Total Value</p>
-          <p className="text-3xl font-bold font-mono tabular-nums mt-1">{formatNgn(totalNgn)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
+        <div className="w-full lg:w-[340px] shrink-0 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-2">
-            <Zap className="h-4 w-4 text-primary" />
-            <p className="text-sm font-semibold">Auto-Offramp Engine</p>
+            <Zap className="h-4 w-4 text-blue-600" />
+            <p className="text-sm font-semibold text-slate-900">Auto-Offramp Engine</p>
             <Badge variant="success" className="ml-auto">ACTIVE</Badge>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-xs text-slate-600 leading-relaxed">
             Any BTC deposited to your addresses is automatically sold at market and paid out to your default bank account.
           </p>
         </div>

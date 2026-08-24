@@ -60,9 +60,11 @@ export default function TerminalShell({
           <span className="text-sm hidden sm:inline">KLASSIQ TRANSAKT</span>
         </Link>
 
-        <TickerStrip />
+        <div className="hidden md:flex ml-auto items-center shrink-0">
+          <TickerStrip />
+        </div>
 
-        <div className="ml-auto flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-accent">
               <span className="h-5 w-5 rounded-full bg-primary/20 text-primary grid place-items-center font-bold text-[10px]">
