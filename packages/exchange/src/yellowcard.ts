@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput, InitiateNgnOnRampInput, OnRampBankDetails, CashDepositStatus } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const YellowCardWebhookSchema = z.object({
@@ -100,6 +100,16 @@ export class YellowCardAdapter implements ExchangeAdapter {
 
   async withdrawCrypto(_input: WithdrawCryptoInput): Promise<Withdrawal> {
     throw new Error(`crypto withdrawals not supported by ${this.provider}`);
+  }
+
+  async initiateNgnOnRamp(_input: InitiateNgnOnRampInput): Promise<{ merchantReference: string; publicId?: string; rate?: number }> {
+    throw new Error(`NGN on-ramp not supported by ${this.provider}`);
+  }
+  async confirmNgnOnRamp(_reference: string): Promise<OnRampBankDetails> {
+    throw new Error(`NGN on-ramp not supported by ${this.provider}`);
+  }
+  async fetchNgnOnRampStatus(_reference: string): Promise<{ status: CashDepositStatus; toAmount?: number }> {
+    throw new Error(`NGN on-ramp not supported by ${this.provider}`);
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

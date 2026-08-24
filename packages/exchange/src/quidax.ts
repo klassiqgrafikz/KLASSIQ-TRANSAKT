@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput, InitiateNgnOnRampInput, OnRampBankDetails, CashDepositStatus } from './types';
 import { env } from '@klassiq-transakt/config';
 
 const QuidaxWebhookSchema = z.object({
@@ -242,6 +242,95 @@ export class QuidaxAdapter implements ExchangeAdapter {
       throw new Error(`Crypto withdrawal failed: ${response.data?.message ?? 'unknown'}`);
     }
     return this.mapWithdrawal(response.data.data);
+  }
+
+  // ── NGN cash-in via Quidax Ramp (on-ramp) ────────────────────────
+  private rampClient?: AxiosInstance;
+  private rampClientFor(): AxiosInstance {
+    if (!this.rampClient) {
+      this.rampClient = axios.create({
+        baseURL: env.RAMP_BASE_URL || 'https://ramp-be.quidax.io/api/v1/merchants',
+        headers: {
+          'x-private-key': env.QUIDAX_API_KEY ?? '',
+          Accept: 'application/json',
+        },
+        timeout: 30000,
+      });
+    }
+    return this.rampClient;
+  }
+
+  async initiateNgnOnRamp(input: InitiateNgnOnRampInput): Promise<{ merchantReference: string; publicId?: string; rate?: number }> {
+    const response = await this.rampClientFor().post('/custodial/on_ramp_transactions/initiate', {
+      from_currency: 'ngn',
+      to_currency: input.toCurrency.toLowerCase(),
+      from_amount: String(input.amountNgn),
+      merchant_reference: input.reference,
+      customer: {
+        email: input.customer.email,
+        first_name: input.customer.firstName,
+        last_name: input.customer.lastName,
+      },
+      wallet_address: {
+        address: input.walletAddress,
+        network: input.network,
+      },
+    });
+
+    if (response.data?.status !== 'ok' && response.data?.status !== 'success') {
+      const msg = response.data?.message ?? `HTTP ${response.status}`;
+      throw new Error(`Cash deposit initiation failed: ${msg}`);
+    }
+    const d = response.data.data ?? {};
+    return {
+      merchantReference: input.reference,
+      publicId: d.public_id,
+      rate: d.rate ? Number(d.rate) : undefined,
+    };
+  }
+
+  async confirmNgnOnRamp(reference: string): Promise<OnRampBankDetails> {
+    const response = await this.rampClientFor().post(
+      `/custodial/on_ramp_transactions/${encodeURIComponent(reference)}/confirm`
+    );
+
+    if (response.data?.status !== 'ok') {
+      throw new Error(`Confirm failed: ${response.data?.message ?? 'unknown'}`);
+    }
+    const d = response.data.data ?? {};
+    return {
+      publicId: String(d.public_id ?? ''),
+      accountNumber: String(d.account_number ?? ''),
+      bankName: String(d.bank_name ?? ''),
+      accountName: String(d.account_name ?? ''),
+      reference: String(d.reference ?? ''),
+      amountNgn: parseFloat(String(d.amount ?? '0')) || 0,
+      amountExpected: parseFloat(String(d.amount_expected ?? '0')) || 0,
+      processorFee: parseFloat(String(d.processor_fee ?? '0')) || 0,
+      vat: parseFloat(String(d.vat ?? '0')) || 0,
+    };
+  }
+
+  async fetchNgnOnRampStatus(reference: string): Promise<{ status: CashDepositStatus; toAmount?: number }> {
+    const response = await this.rampClientFor().get(
+      `/custodial/on_ramp_transactions/${encodeURIComponent(reference)}`
+    );
+    const d = response.data?.data ?? {};
+    const raw = String(d.status ?? '').toLowerCase();
+    const map: Record<string, CashDepositStatus> = {
+      initiated: 'initiated',
+      awaiting_payment: 'awaiting_payment',
+      pending: 'processing',
+      processing: 'processing',
+      completed: 'completed',
+      successful: 'completed',
+      failed: 'failed',
+      rejected: 'failed',
+    };
+    return {
+      status: map[raw] ?? 'unknown',
+      toAmount: d.to_amount ? parseFloat(String(d.to_amount)) : undefined,
+    };
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

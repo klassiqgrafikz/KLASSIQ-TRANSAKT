@@ -1,4 +1,4 @@
-import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker, WalletBalance, DepositAddressInfo, WithdrawCryptoInput, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput } from './types';
+import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, ExchangeService, MarketTicker, WalletBalance, DepositAddressInfo, WithdrawCryptoInput, DepthSnapshot, Kline, MarketTrade, UserOrder, PlaceOrderInput, InitiateNgnOnRampInput, OnRampBankDetails, CashDepositStatus } from './types';
 import { YellowCardAdapter } from './yellowcard';
 import { QuidaxAdapter } from './quidax';
 import { env } from '@klassiq-transakt/config';
@@ -101,6 +101,17 @@ class ExchangeServiceImpl implements ExchangeService {
 
   async withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal> {
     return this.quidaxAdapter.withdrawCrypto(input);
+  }
+
+  // ── NGN cash-in via Quidax Ramp ─────────────────────────────────
+  async initiateNgnOnRamp(input: InitiateNgnOnRampInput) {
+    return this.quidaxAdapter.initiateNgnOnRamp(input);
+  }
+  async confirmNgnOnRamp(reference: string): Promise<OnRampBankDetails> {
+    return this.quidaxAdapter.confirmNgnOnRamp(reference);
+  }
+  async fetchNgnOnRampStatus(reference: string): Promise<{ status: CashDepositStatus; toAmount?: number }> {
+    return this.quidaxAdapter.fetchNgnOnRampStatus(reference);
   }
 
   async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {

@@ -85,6 +85,7 @@ model User {
   invites       Invite[]    @relation("InviteCreator")
   receivedInvite Invite?    @relation("InviteRecipient")
   auditLogs     AuditLog[]
+  cashDeposits  CashDepositIntent[]
 
   @@index([email])
   @@index([inviteCode])
@@ -293,6 +294,30 @@ model ExchangeRateCache {
 
   @@unique([provider, fromCurrency, toCurrency])
   @@index([expiresAt])
+}
+
+model CashDepositIntent {
+  id             String   @id @default(cuid())
+  userId         String
+  merchantRef    String   @unique
+  publicId       String?
+  toCurrency     String   // usdt | btc | usdc ...
+  network        String
+  destAddress    String
+  amountNgn      Decimal  @db.Decimal(18, 2)
+  amountExpected Decimal? @db.Decimal(18, 2)
+  acctNumber     String?
+  acctBankName   String?
+  acctName       String?
+  processorFee   Decimal? @db.Decimal(18, 2)
+  status         String   @default("initiated") // initiated | awaiting_payment | processing | completed | failed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
 
 model PlatformSettings {

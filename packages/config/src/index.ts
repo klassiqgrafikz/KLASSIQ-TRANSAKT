@@ -53,6 +53,7 @@ const envSchema = z.object({
   QUIDAX_API_KEY: z.string().optional(),
   QUIDAX_WEBHOOK_SECRET: z.string().optional(),
   QUIDAX_BASE_URL: z.string().url().default('https://openapi.quidax.io/exchange-open-api/api/v1'),
+  RAMP_BASE_URL: z.string().url().default('https://ramp-be.quidax.io/api/v1/merchants'),
 
   // Resend
   RESEND_API_KEY: z.string().optional(),

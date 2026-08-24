@@ -106,6 +106,31 @@ export interface WithdrawCryptoInput {
   reference: string;
 }
 
+export interface InitiateNgnOnRampInput {
+  toCurrency: string;          // usdt | btc | usdc
+  amountNgn: number;
+  reference: string;           // unique merchant_reference
+  customer: { email: string; firstName: string; lastName: string };
+  walletAddress: string;       // destination for the credited crypto
+  network: string;             // e.g. bitcoin, bep20, trc20
+}
+
+export interface OnRampBankDetails {
+  publicId: string;
+  accountNumber: string;
+  bankName: string;
+  accountName: string;
+  reference: string;
+  amountNgn: number;
+  amountExpected: number;
+  processorFee?: number;
+  vat?: number;
+}
+
+export type CashDepositStatus =
+  | 'initiated' | 'awaiting_payment' | 'processing'
+  | 'completed' | 'failed' | 'unknown';
+
 export interface DepositAddress {
   address: string;
   network: Network;
@@ -181,6 +206,11 @@ export interface ExchangeAdapter {
   getDepositAddresses(currency: string): Promise<DepositAddressInfo[]>;
   createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo>;
   withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal>;
+
+  // NGN cash-in via Ramp (Quidax on-ramp)
+  initiateNgnOnRamp(input: InitiateNgnOnRampInput): Promise<{ merchantReference: string; publicId?: string; rate?: number }>;
+  confirmNgnOnRamp(reference: string): Promise<OnRampBankDetails>;
+  fetchNgnOnRampStatus(reference: string): Promise<{ status: CashDepositStatus; toAmount?: number }>;
 
   // Deposits (Receiving BTC)
   getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }>;

@@ -100,6 +100,58 @@ export async function POST(request: NextRequest) {
 
   const event = payload.event ?? '';
   const data = (payload.data ?? {}) as Record<string, unknown>;
+
+  // ── NGN cash-deposit lifecycle (Quidax Ramp buy_transaction.*) ────
+  if (event.startsWith('buy_transaction.')) {
+    const merchantRef = String(
+      data.merchant_reference ?? data.reference ?? ''
+    );
+    const publicId = typeof data.public_id === 'string' ? data.public_id : null;
+    const rawStatus = event.endsWith('successful')
+      ? 'completed'
+      : event.endsWith('failed')
+        ? 'failed'
+        : 'processing';
+
+    try {
+      const intent = await prisma.cashDepositIntent.findFirst({
+        where: { merchantRef },
+      });
+
+      if (!intent || intent.status === 'completed' || intent.status === 'failed') {
+        return NextResponse.json({ status: 'ignored' }, { status: 200 });
+      }
+
+      await prisma.cashDepositIntent.update({
+        where: { id: intent.id },
+        data: {
+          status: rawStatus,
+          publicId: publicId ?? intent.publicId,
+        },
+      });
+
+      if (rawStatus === 'completed') {
+        await sendEmail(
+          `💰 Cash deposit credited: ${intent.toCurrency.toUpperCase()} incoming`,
+          `<div style="font-family:sans-serif;padding:20px">
+            <h2 style="color:#00a859">💰 Your ₦${Number(intent.amountExpected ?? intent.amountNgn).toLocaleString()} deposit landed</h2>
+            <p>Converted to <b>${intent.toCurrency.toUpperCase()}</b> and credited to your wallet.</p>
+          </div>`
+        );
+      } else if (rawStatus === 'failed') {
+        await sendEmail(
+          '⚠️ Cash deposit failed/refunded',
+          `<div style="font-family:sans-serif;padding:20px"><p>Deposit of ₦${Number(intent.amountNgn).toLocaleString()} could not be processed (name mismatch or wrong amount). Quidax will refund the sender.</p></div>`
+        );
+      }
+
+      return NextResponse.json({ status: 'ok', event }, { status: 200 });
+    } catch (err) {
+      console.error('[Webhook] buy_transaction handling error:', err);
+      return NextResponse.json({ status: 'error' }, { status: 200 }); // don't retry storms
+    }
+  }
+
   const currency = String(data.currency ?? '').toLowerCase();
   const depositId = typeof data.id === 'string' ? data.id : null;
 
