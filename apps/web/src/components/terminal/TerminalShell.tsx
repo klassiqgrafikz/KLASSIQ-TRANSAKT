@@ -14,16 +14,18 @@ import {
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@klassiq-transakt/ui/components/DropdownMenu';
 
-const nav = [
+const mainNav = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Markets', href: '/markets', icon: LayoutGrid },
   { name: 'Trade', href: '/trade/btcngn', icon: CandlestickChart, match: '/trade' },
   { name: 'Wallets', href: '/wallets', icon: Wallet },
+];
+
+const extrasNav = [
   { name: 'Convert', href: '/convert', icon: ArrowLeftRight },
   { name: 'Payment Links', href: '/payment-links', icon: Link2 },
   { name: 'Transactions', href: '/transactions', icon: History },
   { name: 'Bank Accounts', href: '/accounts', icon: CreditCard },
-  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export default function TerminalShell({
@@ -36,12 +38,14 @@ export default function TerminalShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isActive = (item: (typeof nav)[number]) =>
+  const isActive = (item: { href: string; match?: string }) =>
     item.match ? pathname.startsWith(item.match) : pathname === item.href || pathname.startsWith(item.href + '/');
 
-  const railItems = user.role === 'ADMIN'
-    ? [...nav, { name: 'Admin', href: '/admin', icon: Shield }]
-    : nav;
+  const extrasActive = extrasNav.some((item) => isActive(item));
+
+  const allItems = user.role === 'ADMIN'
+    ? [...mainNav, ...extrasNav, { name: 'Admin', href: '/admin', icon: Shield }]
+    : [...mainNav, ...extrasNav];
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -63,7 +67,7 @@ export default function TerminalShell({
 
         {/* Desktop nav tabs — left zone */}
         <nav className="hidden lg:flex items-center gap-1 ml-4">
-          {railItems.map((item) => (
+          {mainNav.map((item) => (
             <Link
               key={item.name}
               href={item.href}
@@ -78,6 +82,41 @@ export default function TerminalShell({
               {item.name}
             </Link>
           ))}
+
+          {/* Extras dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none',
+                extrasActive
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+              )}
+            >
+              Extras
+              <ChevronDown className="h-3 w-3 opacity-70" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={6} className="w-48">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 font-semibold">
+                Quick Links
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {extrasNav.map((item) => (
+                <DropdownMenuItem key={item.name} asChild>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'cursor-pointer flex items-center gap-2.5 px-2 py-2',
+                      isActive(item) && 'text-violet-600 font-medium'
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
 
         {/* Right zone: user */}
@@ -119,7 +158,7 @@ export default function TerminalShell({
         <>
           <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMenuOpen(false)} />
           <nav className="fixed left-0 top-14 bottom-0 z-50 w-64 border-r border-zinc-200 bg-white p-3 space-y-1 lg:hidden overflow-y-auto">
-            {railItems.map((item) => (
+            {mainNav.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -133,6 +172,47 @@ export default function TerminalShell({
                 {item.name}
               </Link>
             ))}
+
+            {/* Extras section divider */}
+            <div className="pt-2 pb-1 px-3">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-semibold">Extras</span>
+            </div>
+
+            {extrasNav.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
+                  isActive(item) ? 'bg-violet-600 text-white' : 'text-zinc-500 hover:bg-zinc-100'
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.name}
+              </Link>
+            ))}
+
+            {user.role === 'ADMIN' && (
+              <>
+                <div className="pt-2 pb-1 px-3">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-semibold">Admin</span>
+                </div>
+                <Link
+                  href="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
+                    pathname === '/admin' || pathname.startsWith('/admin/')
+                      ? 'bg-violet-600 text-white'
+                      : 'text-zinc-500 hover:bg-zinc-100'
+                  )}
+                >
+                  <Shield className="h-5 w-5" />
+                  Admin
+                </Link>
+              </>
+            )}
           </nav>
         </>
       )}
