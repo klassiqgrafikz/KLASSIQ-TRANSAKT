@@ -3,7 +3,7 @@
 import { ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import {
   Bitcoin, LayoutGrid, CandlestickChart, Wallet, ArrowLeftRight,
   Link2, Shield, Settings, Menu, X, LogOut, ChevronDown, History, CreditCard,
@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from '@klassiq-transakt/ui/components/DropdownMenu';
-import TickerStrip from './TickerStrip';
+import NetworkRotator from './NetworkRotator';
 
 const nav = [
   { name: 'Markets', href: '/markets', icon: LayoutGrid },
@@ -44,39 +44,60 @@ export default function TerminalShell({
     : nav;
 
   return (
-    <div className="theme-terminal min-h-screen bg-background text-foreground">
-      {/* Top bar */}
-      <header className="fixed top-0 inset-x-0 z-50 h-12 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur px-3">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+      {/* Top bar — light, 56px, two zones */}
+      <header className="fixed top-0 inset-x-0 z-50 h-14 flex items-center gap-3 border-b border-zinc-200 bg-white px-3 shadow-sm">
+        {/* Left: hamburger + brand + nav tabs */}
         <button
-          className="md:hidden p-1.5 rounded hover:bg-accent"
+          className="lg:hidden p-1.5 rounded hover:bg-zinc-100"
           onClick={() => setMenuOpen(v => !v)}
           aria-label="Toggle menu"
         >
           {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
 
-        <Link href="/markets" className="flex items-center gap-1.5 font-bold tracking-tight text-primary shrink-0">
+        <Link href="/markets" className="flex items-center gap-1.5 font-bold tracking-tight text-violet-600 shrink-0">
           <Bitcoin className="h-5 w-5" />
           <span className="text-sm hidden sm:inline">KLASSIQ TRANSAKT</span>
         </Link>
 
-        <div className="hidden md:flex ml-auto items-center shrink-0">
-          <TickerStrip />
-        </div>
+        {/* Desktop nav tabs — left zone */}
+        <nav className="hidden lg:flex items-center gap-1 ml-4">
+          {railItems.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                isActive(item)
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+              )}
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              {item.name}
+            </Link>
+          ))}
+        </nav>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right zone: rotating ticker + user */}
+        <div className="ml-auto flex items-center gap-3 shrink-0">
+          <div className="hidden sm:block">
+            <NetworkRotator />
+          </div>
+
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-accent">
-              <span className="h-5 w-5 rounded-full bg-primary/20 text-primary grid place-items-center font-bold text-[10px]">
+            <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-50">
+              <span className="h-6 w-6 rounded-full bg-violet-100 text-violet-700 grid place-items-center font-bold text-[10px]">
                 {(user.name || user.email).charAt(0).toUpperCase()}
               </span>
               <span className="hidden sm:inline max-w-[120px] truncate">{user.email}</span>
               <ChevronDown className="h-3 w-3 opacity-60" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 theme-terminal">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">
                 <div>{user.name}</div>
-                <div className="text-muted-foreground font-normal">{user.role}</div>
+                <div className="text-zinc-500 font-normal">{user.role}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -87,7 +108,7 @@ export default function TerminalShell({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut({ callbackUrl: '/' })}
-                className="text-red-400 focus:text-red-400 cursor-pointer"
+                className="text-red-600 focus:text-red-600 cursor-pointer"
               >
                 <LogOut className="mr-2 h-4 w-4" /> Sign Out
               </DropdownMenuItem>
@@ -96,18 +117,11 @@ export default function TerminalShell({
         </div>
       </header>
 
-      {/* Icon rail — desktop */}
-      <nav className="hidden md:flex fixed left-0 top-12 bottom-0 z-40 w-[68px] flex-col items-center gap-1 border-r border-border bg-card py-3">
-        {railItems.map((item) => (
-          <RailLink key={item.name} item={item} active={isActive(item)} />
-        ))}
-      </nav>
-
       {/* Mobile drawer */}
       {menuOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMenuOpen(false)} />
-          <nav className="fixed left-0 top-12 bottom-0 z-50 w-56 border-r border-border bg-card p-3 space-y-1 md:hidden">
+          <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMenuOpen(false)} />
+          <nav className="fixed left-0 top-14 bottom-0 z-50 w-64 border-r border-zinc-200 bg-white p-3 space-y-1 lg:hidden overflow-y-auto">
             {railItems.map((item) => (
               <Link
                 key={item.name}
@@ -115,35 +129,25 @@ export default function TerminalShell({
                 onClick={() => setMenuOpen(false)}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
-                  isActive(item) ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent'
+                  isActive(item) ? 'bg-violet-600 text-white' : 'text-zinc-500 hover:bg-zinc-100'
                 )}
               >
                 <item.icon className="h-5 w-5" />
                 {item.name}
               </Link>
             ))}
+            {/* Mobile: also show rotator inside drawer for visibility */}
+            <div className="pt-4 sm:hidden">
+              <NetworkRotator />
+            </div>
           </nav>
         </>
       )}
 
-      {/* Content */}
-      <main className="pt-12 md:pl-[68px] min-h-screen">{children}</main>
+      {/* Content — no left padding, max-width centered */}
+      <main className="pt-14 min-h-screen">
+        <div className="mx-auto max-w-7xl">{children}</div>
+      </main>
     </div>
-  );
-}
-
-function RailLink({ item, active }: { item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }; active: boolean }) {
-  return (
-    <Link
-      href={item.href}
-      title={item.name}
-      className={cn(
-        'group relative flex w-full flex-col items-center gap-1 rounded-lg py-2.5 text-[10px] transition-colors',
-        active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-      )}
-    >
-      <item.icon className="h-5 w-5" />
-      {item.name}
-    </Link>
   );
 }
