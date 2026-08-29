@@ -8,8 +8,7 @@ import { Input } from '@klassiq-transakt/ui/components/Input';
 import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
 import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
-import { Bitcoin, Loader2, Mail, Lock, User, CheckCircle, AlertCircle } from 'lucide-react';
-import { prisma } from '@klassiq-transakt/db';
+import { Bitcoin, Mail, Lock, User, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface InviteData {
   email: string;
@@ -26,6 +25,8 @@ export default function AcceptInvitePage() {
   const [invite, setInvite] = useState<InviteData | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export default function AcceptInvitePage() {
       }
 
       setInvite(data);
-    } catch (err) {
+    } catch {
       setError('Failed to verify invite');
     } finally {
       setChecking(false);
@@ -102,7 +103,7 @@ export default function AcceptInvitePage() {
 
       setSuccess(true);
       setTimeout(() => router.push('/dashboard'), 2000);
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -116,7 +117,7 @@ export default function AcceptInvitePage() {
           <Card>
             <CardContent className="p-8 text-center">
               <div className="flex justify-center mb-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent rounded-full" />
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
               </div>
               <p className="text-muted-foreground">Verifying your invite...</p>
             </CardContent>
@@ -181,7 +182,7 @@ export default function AcceptInvitePage() {
             <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mx-auto mb-4">
               <Bitcoin className="h-8 w-8" />
             </div>
-            <CardTitle className="text-2xl">You're Invited!</CardTitle>
+            <CardTitle className="text-2xl">You&apos;re Invited!</CardTitle>
             <CardDescription>
               {invite.email} • {invite.role} access
             </CardDescription>
@@ -227,15 +228,24 @@ export default function AcceptInvitePage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="•••••••• (min 8 characters)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     required
                     disabled={isLoading}
                     autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -245,27 +255,35 @@ export default function AcceptInvitePage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
-                    type="password"
+                    type={showConfirm ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     required
                     disabled={isLoading}
                     autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
               {error && (
                 <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription className="text-sm leading-relaxed">{error}</AlertDescription>
                 </Alert>
               )}
 
               <Button type="submit" className="w-full" size="lg" loading={isLoading}>
-                {isLoading ? <Loader2 className="h-4 w-4" /> : 'Create Account'}
+                Create Account
               </Button>
             </form>
           </CardContent>

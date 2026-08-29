@@ -6,6 +6,7 @@ const publicPaths = [
   '/',
   '/auth/login',
   '/auth/accept-invite',
+  '/auth/request-invite',
   '/auth/error',
   '/api/auth',
   '/api/webhooks',
