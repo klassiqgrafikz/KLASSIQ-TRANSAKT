@@ -13,7 +13,12 @@ export async function GET() {
 
   try {
     const wallets = await exchangeService.getWallets();
-    const totalNgn = wallets.reduce((sum, w) => sum + w.convertedNgn, 0);
+    // NGN wallet's converted_balance is the balance itself (after adapter fix), but be defensive:
+    // if any NGN wallet still has convertedNgn === 0, fall back to its balance so funding reflects instantly
+    const totalNgn = wallets.reduce((sum, w) => {
+      if (w.currency === 'ngn' && w.convertedNgn === 0 && w.balance > 0) return sum + w.balance;
+      return sum + w.convertedNgn;
+    }, 0);
 
     return NextResponse.json({
       wallets: wallets.sort((a, b) => b.convertedNgn - a.convertedNgn),

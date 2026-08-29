@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@klassiq-transakt/ui/components/Button';
 import { formatNgn } from '@klassiq-transakt/ui/lib/utils';
-import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, RefreshCw } from 'lucide-react';
 import NetworkView from '@/components/terminal/NetworkView';
 import MoneyModal from '@/components/terminal/wallets/MoneyModal';
 
@@ -28,20 +28,43 @@ export default function DashboardPage() {
       const res = await fetch('/api/wallets');
       const json = await res.json();
       if (res.ok) {
-        setWallets(json.wallets ?? []);
-        setTotalNgn(json.totalNgn ?? 0);
+        const ws: WalletRow[] = json.wallets ?? [];
+        setWallets(ws);
+        // API total now includes NGN, but derive defensively so realtime NGN funding never appears as ₦0
+        let apiTotal: number = json.totalNgn ?? 0;
+        if (apiTotal === 0) {
+          const fallback = ws.reduce((s, w) => s + (w.currency === 'ngn' ? w.balance : w.convertedNgn), 0);
+          if (fallback > 0) apiTotal = fallback;
+        }
+        setTotalNgn(apiTotal);
       }
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // Realtime — re-poll every 15s so funding reflects without manual refresh
+  useEffect(() => {
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  // Defensive client-side total — ensures NGN balance is always counted even if API total lags
+  const displayTotal = useMemo(() => {
+    if (totalNgn > 0) return totalNgn;
+    return wallets.reduce((s, w) => s + (w.currency === 'ngn' ? w.balance : w.convertedNgn), 0);
+  }, [totalNgn, wallets]);
 
   return (
     <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-bold">Dashboard</h1>
-        <p className="text-sm text-zinc-500">Your balances and market overview</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Dashboard</h1>
+          <p className="text-sm text-zinc-500">Your balances and market overview</p>
+        </div>
+        <button onClick={load} className="p-2 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50" title="Refresh balances">
+          <RefreshCw className={`h-4 w-4 text-zinc-600 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Hero: balance + actions LEFT, network RIGHT */}
@@ -57,7 +80,7 @@ export default function DashboardPage() {
               {loading ? (
                 <div className="h-9 w-40 mt-1 animate-pulse rounded bg-zinc-100" />
               ) : (
-                <p className="text-2xl md:text-3xl font-bold font-mono tabular-nums mt-0.5">{formatNgn(totalNgn)}</p>
+                <p className="text-2xl md:text-3xl font-bold font-mono tabular-nums mt-0.5">{formatNgn(displayTotal)}</p>
               )}
               <p className="text-xs text-zinc-500 mt-1">
                 Balances valued in NGN · <span className="inline-flex items-center gap-1 font-medium text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Auto-Offramp ACTIVE</span>

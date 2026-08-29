@@ -176,14 +176,24 @@ export class QuidaxAdapter implements ExchangeAdapter {
   async getWallets(): Promise<WalletBalance[]> {
     const response = await this.client.get('/users/me/wallets');
     const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
-    return rows.map(w => ({
-      currency: String(w.currency ?? '').toLowerCase(),
-      balance: parseFloat(String(w.balance ?? '0')) || 0,
-      locked: parseFloat(String(w.locked ?? '0')) || 0,
-      staked: parseFloat(String(w.staked ?? '0')) || 0,
-      isCrypto: Boolean(w.is_crypto),
-      convertedNgn: parseFloat(String(w.converted_balance ?? '0')) || 0,
-    }));
+    return rows.map(w => {
+      const currency = String(w.currency ?? '').toLowerCase();
+      const balance = parseFloat(String(w.balance ?? '0')) || 0;
+      const locked = parseFloat(String(w.locked ?? '0')) || 0;
+      const isCrypto = Boolean(w.is_crypto);
+      let convertedNgn = parseFloat(String(w.converted_balance ?? '0')) || 0;
+      // Quidax often returns 0 for NGN's own converted_balance — fall back to NGN balance itself
+      if (currency === 'ngn' && convertedNgn === 0) convertedNgn = balance;
+      // Safety: if crypto has balance but no valuation yet, don't leave it zero if NGN wallet exists etc — keep as 0 (will be valued via ticker later)
+      return {
+        currency,
+        balance,
+        locked,
+        staked: parseFloat(String(w.staked ?? '0')) || 0,
+        isCrypto,
+        convertedNgn,
+      };
+    });
   }
 
   async getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo> {
