@@ -15,7 +15,7 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    await exchangeService.cancelOrder(id);
+    await exchangeService.cancelOrder(id, session.user.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(`[api/trade/orders/${id} DELETE]`, error);

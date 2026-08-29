@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
   try {
     // Try default first; fall back to listing (some coins have no default until generated)
     try {
-      const address = await exchangeService.getDefaultDepositAddress(currency);
+      const address = await exchangeService.getDefaultDepositAddress(currency, session.user.id);
       return NextResponse.json({ address });
     } catch {
-      const list = await exchangeService.getDepositAddresses(currency);
+      const list = await exchangeService.getDepositAddresses(currency, session.user.id);
       return NextResponse.json({
         address: list[0] ?? null,
         all: list,
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   try {
     const body = createSchema.parse(await request.json());
-    const address = await exchangeService.createDepositAddress(body.currency.toLowerCase(), body.network);
+    const address = await exchangeService.createDepositAddress(body.currency.toLowerCase(), body.network, session.user.id);
 
     // Generation may be async — surface that to the UI
     return NextResponse.json({

@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const wallets = await exchangeService.getWallets();
+    const wallets = await exchangeService.getWallets(session.user.id);
     // NGN wallet's converted_balance is the balance itself (after adapter fix), but be defensive:
     // if any NGN wallet still has convertedNgn === 0, fall back to its balance so funding reflects instantly
     const totalNgn = wallets.reduce((sum, w) => {

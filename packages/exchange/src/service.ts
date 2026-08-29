@@ -70,37 +70,83 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.quidaxAdapter.getMarketTrades(market, limit);
   }
 
-  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
-    return this.withFallback(adapter => adapter.placeOrder(input));
+  async placeOrder(input: PlaceOrderInput, userId?: string): Promise<SellOrder> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).placeOrder(input, subId));
   }
 
-  async cancelOrder(orderId: string): Promise<void> {
-    return this.withFallback(adapter => adapter.cancelOrder(orderId));
+  async cancelOrder(orderId: string, userId?: string): Promise<void> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).cancelOrder(orderId, subId));
   }
 
-  async getUserOrders(market?: string, limit = 100): Promise<UserOrder[]> {
-    return this.withFallback(adapter => adapter.getUserOrders(market, limit));
+  async getUserOrders(market?: string, limit = 100, userId?: string): Promise<UserOrder[]> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).getUserOrders(market, limit, subId));
   }
 
-  // ── Wallets (Quidax capability) ──────────────────────────────────
-  async getWallets(): Promise<WalletBalance[]> {
-    return this.quidaxAdapter.getWallets();
+  // ── Per-user sub-account helpers ───────────────────────────────
+  private async resolveSubAccountId(userId?: string): Promise<string | undefined> {
+    if (!userId) return undefined;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { quidaxSubAccountId: true, role: true, email: true, name: true },
+    });
+    if (!user) throw new Error(`User not found: ${userId}`);
+    if (user.quidaxSubAccountId) return user.quidaxSubAccountId;
+    // ADMIN retains merchant principal to preserve existing funded balance / avoid migration surprise
+    if (user.role === 'ADMIN') return undefined;
+    const email = user.email;
+    const name = user.name || email.split('@')[0];
+    const [firstName, ...rest] = name.trim().split(/\s+/);
+    const lastName = rest.join(' ') || 'User';
+    try {
+      const subId = await this.quidaxAdapter.createSubAccount({ email, firstName, lastName });
+      await prisma.user.update({
+        where: { id: userId },
+        data: { quidaxSubAccountId: subId, quidaxProvisionedAt: new Date() },
+      });
+      return subId;
+    } catch (e) {
+      console.error(`[exchangeService] Failed to provision sub-account for ${userId}`, e);
+      throw new Error(`Failed to provision exchange sub-account for ${email}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
-  async getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo> {
-    return this.quidaxAdapter.getDefaultDepositAddress(currency);
+  /** Ensure a Quidax sub-account exists for userId; returns its id. ADMIN returns undefined (merchant). */
+  async ensureSubAccountForUser(userId: string): Promise<string | undefined> {
+    return this.resolveSubAccountId(userId);
   }
 
-  async getDepositAddresses(currency: string): Promise<DepositAddressInfo[]> {
-    return this.quidaxAdapter.getDepositAddresses(currency);
+  /** Explicit provision from registration flows — separated for clarity. */
+  async provisionSubAccountForUser(userId: string): Promise<string | undefined> {
+    return this.resolveSubAccountId(userId);
   }
 
-  async createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo> {
-    return this.quidaxAdapter.createDepositAddress(currency, network);
+  // ── Wallets (Quidax capability — now per-user) ──────────────────────
+  async getWallets(userId?: string): Promise<WalletBalance[]> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.quidaxAdapter.getWallets(subId);
   }
 
-  async withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal> {
-    return this.quidaxAdapter.withdrawCrypto(input);
+  async getDefaultDepositAddress(currency: string, userId?: string): Promise<DepositAddressInfo> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.quidaxAdapter.getDefaultDepositAddress(currency, subId);
+  }
+
+  async getDepositAddresses(currency: string, userId?: string): Promise<DepositAddressInfo[]> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.quidaxAdapter.getDepositAddresses(currency, subId);
+  }
+
+  async createDepositAddress(currency: string, network?: string, userId?: string): Promise<DepositAddressInfo> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.quidaxAdapter.createDepositAddress(currency, network, subId);
+  }
+
+  async withdrawCrypto(input: WithdrawCryptoInput, userId?: string): Promise<Withdrawal> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.quidaxAdapter.withdrawCrypto(input, subId);
   }
 
   // ── NGN cash-in via Quidax Ramp ─────────────────────────────────
@@ -114,22 +160,26 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.quidaxAdapter.fetchNgnOnRampStatus(reference);
   }
 
-  async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
-    return this.withFallback(adapter => adapter.getDepositStatus(depositId));
+  async getDepositStatus(depositId: string, userId?: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).getDepositStatus(depositId, subId));
   }
 
-  async sellBtcWithFill(btcAmount: number): Promise<SellOrder> {
-    const order = await this.sellBtc(btcAmount);
+  async sellBtcWithFill(btcAmount: number, userId?: string): Promise<SellOrder> {
+    const order = await this.sellBtc(btcAmount, userId);
     if (order.status === TxnStatus.COMPLETED) return order;
-    return this.withFallback(adapter => adapter.pollOrderUntilDone(order.providerOrderId));
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).pollOrderUntilDone(order.providerOrderId, subId));
   }
 
-  async sellBtc(btcAmount: number): Promise<SellOrder> {
-    return this.withFallback(adapter => adapter.createMarketSell(btcAmount));
+  async sellBtc(btcAmount: number, userId?: string): Promise<SellOrder> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).createMarketSell(btcAmount, subId));
   }
 
-  async withdrawNgn(params: WithdrawalParams): Promise<Withdrawal> {
-    return this.withFallback(adapter => adapter.withdrawNgn(params));
+  async withdrawNgn(params: WithdrawalParams, userId?: string): Promise<Withdrawal> {
+    const subId = await this.resolveSubAccountId(userId);
+    return this.withFallback(adapter => (adapter as unknown as QuidaxAdapter).withdrawNgn(params, subId));
   }
 
   async getBanks(): Promise<Bank[]> {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@klassiq-transakt/db';
+import { exchangeService } from '@klassiq-transakt/exchange';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +89,19 @@ export async function POST(request: NextRequest) {
 
       return newUser;
     });
+
+    // Best-effort Quidax sub-account isolation — like quidax.com personal wallets
+    try {
+      await exchangeService.provisionSubAccountForUser(user.id);
+      await prisma.auditLog.create({
+        data: { userId: user.id, action: 'QUIDAX_SUBACCOUNT_CREATED', entity: 'User', entityId: user.id, after: { email: user.email } },
+      });
+    } catch (provisionError) {
+      console.warn(`[accept-invite] Sub-account provision failed for ${user.email}:`, provisionError);
+      await prisma.auditLog.create({
+        data: { userId: user.id, action: 'QUIDAX_PROVISION_PENDING', entity: 'User', entityId: user.id, after: { email: user.email, error: provisionError instanceof Error ? provisionError.message : String(provisionError) } },
+      });
+    }
 
     return NextResponse.json({
       success: true,

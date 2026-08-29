@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         address: body.address,
         network: body.network,
         reference,
-      });
+      }, userId);
 
       const txn = await prisma.transaction.create({
         data: {
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       accountNumber: account.accountNumber,
       accountName: account.accountName,
       reference,
-    });
+    }, userId);
 
     const txn = await prisma.transaction.create({
       data: {

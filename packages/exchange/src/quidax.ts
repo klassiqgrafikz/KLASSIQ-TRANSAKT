@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
 import { ExchangeAdapter, ExchangeProvider, Network, TxnStatus, Bank, DepositAddress, DepositAddressInfo, RateQuote, SellOrder, Withdrawal, WebhookEvent, WithdrawalParams, MarketTicker, DepthSnapshot, DepthLevel, Kline, MarketTrade, UserOrder, PlaceOrderInput, WalletBalance, WithdrawCryptoInput, InitiateNgnOnRampInput, OnRampBankDetails, CashDepositStatus } from './types';
 import { env } from '@klassiq-transakt/config';
 
@@ -81,6 +82,39 @@ export class QuidaxAdapter implements ExchangeAdapter {
       .map(([market, v]) => this.mapTicker(market, v.ticker as never));
   }
 
+  // ── Sub-accounts (per-user isolation) ───────────────────────────
+  /**
+   * Create a Quidax sub-account for a platform user.
+   * Merchant API: POST /users { email, first_name, last_name, password }
+   * Returns sub_account_id to store on User.quidaxSubAccountId.
+   */
+  async createSubAccount(input: { email: string; firstName: string; lastName: string }): Promise<string> {
+    const password = `${randomBytes(12).toString('hex')}Aa1!`;
+    try {
+      const res = await this.client.post('/users', {
+        email: input.email.toLowerCase(),
+        first_name: input.firstName,
+        last_name: input.lastName,
+        password,
+        password_confirmation: password,
+      });
+      const id = String(res.data?.data?.id ?? res.data?.id ?? '');
+      if (!id) throw new Error('No id in create sub-account response');
+      return id;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // If email already exists on Quidax, try to fetch existing user by email
+      // Merchant can list users: GET /users?q=email
+      try {
+        const list = await this.client.get('/users', { params: { q: input.email.toLowerCase() } });
+        const rows = Array.isArray(list.data?.data) ? list.data.data : [];
+        const found = rows.find((u: Record<string, unknown>) => String(u.email ?? '').toLowerCase() === input.email.toLowerCase());
+        if (found?.id) return String(found.id);
+      } catch {}
+      throw new Error(`Quidax sub-account creation failed: ${msg}`);
+    }
+  }
+
   async getDepth(market: string, limit = 20): Promise<DepthSnapshot> {
     const m = market.toLowerCase();
     const response = await this.client.get(`/markets/${m}/depth`, { params: { limit } });
@@ -121,7 +155,7 @@ export class QuidaxAdapter implements ExchangeAdapter {
     }
   }
 
-  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
+  async placeOrder(input: PlaceOrderInput, subAccountId?: string): Promise<SellOrder> {
     const body: Record<string, unknown> = {
       market: input.market.toLowerCase(),
       side: input.side,
@@ -132,15 +166,15 @@ export class QuidaxAdapter implements ExchangeAdapter {
       if (!input.price || input.price <= 0) throw new Error('Limit orders require a positive price');
       body.price = String(input.price);
     }
-    const response = await this.client.post('/users/me/orders', body);
+    const response = await this.client.post(`${this.userPath(subAccountId)}/orders`, body);
     if (response.data?.status !== 'success') {
       throw new Error(`Order rejected: ${response.data?.message ?? 'unknown'}`);
     }
     return this.mapSellOrder(response.data.data);
   }
 
-  async cancelOrder(orderId: string): Promise<void> {
-    const response = await this.client.post(`/users/me/orders/${orderId}/cancel`);
+  async cancelOrder(orderId: string, subAccountId?: string): Promise<void> {
+    const response = await this.client.post(`${this.userPath(subAccountId)}/orders/${orderId}/cancel`);
     if (response.data?.status && response.data.status !== 'success') {
       throw new Error(`Cancel failed: ${response.data.message ?? 'unknown'}`);
     }
@@ -148,8 +182,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
 
   private static readonly OPEN_STATES = new Set(['wait', 'new', 'new_', 'pending', 'partially', 'partial']);
 
-  async getUserOrders(market?: string, limit = 100): Promise<UserOrder[]> {
-    const response = await this.client.get('/users/me/orders', {
+  async getUserOrders(market?: string, limit = 100, subAccountId?: string): Promise<UserOrder[]> {
+    const response = await this.client.get(`${this.userPath(subAccountId)}/orders`, {
       params: { ...(market ? { market: market.toLowerCase() } : {}), limit },
     });
     const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
@@ -171,10 +205,14 @@ export class QuidaxAdapter implements ExchangeAdapter {
     });
   }
 
-  // ── Wallets ───────────────────────────────────────────────────────
+  // ── Wallets (per-user via sub-account id) ───────────────────────
+  private userPath(subAccountId?: string): string {
+    return subAccountId ? `/users/${subAccountId}` : '/users/me';
+  }
 
-  async getWallets(): Promise<WalletBalance[]> {
-    const response = await this.client.get('/users/me/wallets');
+  async getWallets(subAccountId?: string): Promise<WalletBalance[]> {
+    const path = `${this.userPath(subAccountId)}/wallets`;
+    const response = await this.client.get(path);
     const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
     return rows.map(w => {
       const currency = String(w.currency ?? '').toLowerCase();
@@ -196,9 +234,9 @@ export class QuidaxAdapter implements ExchangeAdapter {
     });
   }
 
-  async getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo> {
+  async getDefaultDepositAddress(currency: string, subAccountId?: string): Promise<DepositAddressInfo> {
     const c = currency.toLowerCase();
-    const response = await this.client.get(`/users/me/wallets/${c}/address`);
+    const response = await this.client.get(`${this.userPath(subAccountId)}/wallets/${c}/address`);
     const d = response.data?.data ?? {};
     return {
       id: String(d.id ?? ''),
@@ -209,9 +247,9 @@ export class QuidaxAdapter implements ExchangeAdapter {
     };
   }
 
-  async getDepositAddresses(currency: string): Promise<DepositAddressInfo[]> {
+  async getDepositAddresses(currency: string, subAccountId?: string): Promise<DepositAddressInfo[]> {
     const c = currency.toLowerCase();
-    const response = await this.client.get(`/users/me/wallets/${c}/addresses`);
+    const response = await this.client.get(`${this.userPath(subAccountId)}/wallets/${c}/addresses`);
     const rows = (Array.isArray(response.data?.data) ? response.data.data : []) as Record<string, unknown>[];
     return rows.map(d => ({
       id: String(d.id ?? ''),
@@ -222,9 +260,9 @@ export class QuidaxAdapter implements ExchangeAdapter {
     }));
   }
 
-  async createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo> {
+  async createDepositAddress(currency: string, network?: string, subAccountId?: string): Promise<DepositAddressInfo> {
     const c = currency.toLowerCase();
-    const response = await this.client.post(`/users/me/wallets/${c}/addresses`, null, {
+    const response = await this.client.post(`${this.userPath(subAccountId)}/wallets/${c}/addresses`, null, {
       params: network ? { network } : undefined,
     });
     const d = response.data?.data ?? {};
@@ -238,8 +276,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
     };
   }
 
-  async withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal> {
-    const response = await this.client.post('/users/me/withdraws', {
+  async withdrawCrypto(input: WithdrawCryptoInput, subAccountId?: string): Promise<Withdrawal> {
+    const response = await this.client.post(`${this.userPath(subAccountId)}/withdraws`, {
       currency: input.currency.toLowerCase(),
       amount: String(input.amount),
       fund_uid: input.address,
@@ -343,8 +381,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
     };
   }
 
-  async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
-    const response = await this.client.get(`/users/me/deposits/${depositId}`);
+  async getDepositStatus(depositId: string, subAccountId?: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
+    const response = await this.client.get(`${this.userPath(subAccountId)}/deposits/${depositId}`);
     const data = response.data.data;
 
     const statusMap: Record<string, TxnStatus> = {
@@ -361,8 +399,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
     };
   }
 
-  async createMarketSell(btcAmount: number): Promise<SellOrder> {
-    const response = await this.client.post('/users/me/orders', {
+  async createMarketSell(btcAmount: number, subAccountId?: string): Promise<SellOrder> {
+    const response = await this.client.post(`${this.userPath(subAccountId)}/orders`, {
       market: 'btcngn',
       side: 'sell',
       ord_type: 'market',
@@ -373,16 +411,16 @@ export class QuidaxAdapter implements ExchangeAdapter {
     return this.mapSellOrder(data);
   }
 
-  async getOrderStatus(orderId: string): Promise<SellOrder> {
-    const response = await this.client.get(`/users/me/orders/${orderId}`);
+  async getOrderStatus(orderId: string, subAccountId?: string): Promise<SellOrder> {
+    const response = await this.client.get(`${this.userPath(subAccountId)}/orders/${orderId}`);
     return this.mapSellOrder(response.data.data);
   }
 
-  async pollOrderUntilDone(orderId: string, timeoutMs = 15000, intervalMs = 1500): Promise<SellOrder> {
+  async pollOrderUntilDone(orderId: string, subAccountId?: string, timeoutMs = 15000, intervalMs = 1500): Promise<SellOrder> {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
-      const order = await this.getOrderStatus(orderId);
+      const order = await this.getOrderStatus(orderId, subAccountId);
       if (order.status === TxnStatus.COMPLETED) return order;
       if (order.status === TxnStatus.FAILED) throw new Error(`Order failed: ${orderId}`);
       await new Promise(resolve => setTimeout(resolve, intervalMs));
@@ -391,8 +429,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
     throw new Error(`Order fill timeout after ${timeoutMs}ms for order ${orderId}`);
   }
 
-  async withdrawNgn(params: WithdrawalParams): Promise<Withdrawal> {
-    const response = await this.client.post('/users/me/withdraws', {
+  async withdrawNgn(params: WithdrawalParams, subAccountId?: string): Promise<Withdrawal> {
+    const response = await this.client.post(`${this.userPath(subAccountId)}/withdraws`, {
       currency: 'ngn',
       amount: params.amount.toFixed(2),
       fund_uid: params.accountNumber,
@@ -405,8 +443,8 @@ export class QuidaxAdapter implements ExchangeAdapter {
     return this.mapWithdrawal(data);
   }
 
-  async getWithdrawalStatus(withdrawalId: string): Promise<Withdrawal> {
-    const response = await this.client.get(`/users/me/withdraws/${withdrawalId}`);
+  async getWithdrawalStatus(withdrawalId: string, subAccountId?: string): Promise<Withdrawal> {
+    const response = await this.client.get(`${this.userPath(subAccountId)}/withdraws/${withdrawalId}`);
     return this.mapWithdrawal(response.data.data);
   }
 

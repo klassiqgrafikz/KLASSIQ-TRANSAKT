@@ -26,8 +26,8 @@ export async function POST(request: Request) {
   try {
     const body = initiateSchema.parse(await request.json());
 
-    // Destination: owner's own deposit address on Quidax for the chosen coin
-    const dest = await exchangeService.getDefaultDepositAddress(body.toCurrency);
+    // Destination: user's own deposit address on their isolated sub-account
+    const dest = await exchangeService.getDefaultDepositAddress(body.toCurrency, userId);
     if (!dest?.address) {
       return NextResponse.json(
         { error: `No ${body.toCurrency.toUpperCase()} deposit address available yet — generate one under Wallets → Deposit first.` },

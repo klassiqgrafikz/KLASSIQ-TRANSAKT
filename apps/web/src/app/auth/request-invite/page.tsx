@@ -95,8 +95,15 @@ export default function RequestInvitePage() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Request an Invite</CardTitle>
-            <CardDescription>Enter your details and we&apos;ll create your invite instantly</CardDescription>
+            <CardDescription>Invite-only is now optional — you can also create your account directly.</CardDescription>
           </CardHeader>
+          <div className="px-6">
+            <Alert className="bg-violet-50 border-violet-200 text-violet-800">
+              <AlertDescription className="text-sm text-center">
+                Want instant access? <Link href="/auth/register" className="font-medium underline">Create account directly</Link> — your wallets will be isolated like on Quidax.
+              </AlertDescription>
+            </Alert>
+          </div>
 
           <CardContent className="space-y-4">
             {error && (

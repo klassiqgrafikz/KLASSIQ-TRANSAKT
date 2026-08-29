@@ -116,6 +116,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           entityId: user.id,
         },
       });
+      // Lazy provision Quidax sub-account for open-registration users (like quidax.com personal wallets)
+      // ADMIN keeps merchant principal; USER gets isolated sub-account on first sign-in if not yet provisioned
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { quidaxSubAccountId: true, role: true },
+        });
+        if (dbUser && !dbUser.quidaxSubAccountId && dbUser.role !== 'ADMIN') {
+          const { exchangeService } = await import('@klassiq-transakt/exchange');
+          await exchangeService.provisionSubAccountForUser(user.id);
+        }
+      } catch (e) {
+        console.warn(`[auth events.signIn] sub-account provisioning failed for ${user.id}:`, e);
+      }
     },
   },
   secret: env.NEXTAUTH_SECRET,

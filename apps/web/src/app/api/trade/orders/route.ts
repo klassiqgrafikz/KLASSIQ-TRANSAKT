@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const market = request.nextUrl.searchParams.get('market');
   try {
-    const all = await exchangeService.getUserOrders(market ?? undefined);
+    const all = await exchangeService.getUserOrders(market ?? undefined, 100, session.user.id);
     const open = all.filter(o => o.open);
     const history = all.filter(o => !o.open).slice(0, 50);
     return NextResponse.json({ open, history });
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const input = placeSchema.parse(body);
 
-    const order = await exchangeService.placeOrder(input);
+    const order = await exchangeService.placeOrder(input, session.user.id);
 
     // Audit trail
     await prisma.auditLog.create({

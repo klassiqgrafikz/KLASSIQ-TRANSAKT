@@ -47,6 +47,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const errorParam = searchParams.get('error');
+  const justRegistered = searchParams.get('registered') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -99,6 +100,11 @@ function LoginForm() {
           </CardHeader>
 
           <CardContent className="space-y-4">
+            {justRegistered && !displayError && (
+              <Alert className="bg-green-50 border-green-200 text-green-800 mb-2">
+                <AlertDescription className="text-sm leading-relaxed">Account created! Please sign in with your new credentials.</AlertDescription>
+              </Alert>
+            )}
             {displayError && (
               <Alert variant="destructive" className="mb-2">
                 <AlertDescription className="text-sm leading-relaxed">{displayError}</AlertDescription>
@@ -165,8 +171,8 @@ function LoginForm() {
           <CardFooter className="flex flex-col space-y-4">
             <p className="text-sm text-center text-muted-foreground">
               Don&apos;t have an account?{' '}
-              <Link href="/auth/request-invite" className="text-primary hover:underline font-medium">
-                Request an invite
+              <Link href="/auth/register" className="text-primary hover:underline font-medium">
+                Create account
               </Link>
             </p>
             <p className="text-xs text-center text-muted-foreground">

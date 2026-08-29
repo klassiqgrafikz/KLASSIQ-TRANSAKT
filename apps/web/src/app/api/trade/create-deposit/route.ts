@@ -30,8 +30,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
-    // Use the user's default on-chain BTC deposit address from Quidax
-    const addrInfo = await exchangeService.getDefaultDepositAddress('btc');
+    // Use the user's own deposit address from their isolated sub-account
+    const addrInfo = await exchangeService.getDefaultDepositAddress('btc', session.user.id);
     const deposit = {
       address: addrInfo.address,
       network: network as string,

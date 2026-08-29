@@ -174,10 +174,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'duplicate' }, { status: 200 });
   }
 
-  // Resolve owner (single-user platform: first ACTIVE admin/user)
-  const owner =
-    (await prisma.user.findFirst({ where: { role: 'ADMIN', status: 'ACTIVE' } })) ??
-    (await prisma.user.findFirst({ where: { status: 'ACTIVE' } }));
+  // Resolve owner — per-user sub-account isolation (like quidax.com)
+  // Try Quidax sub-account id in webhook payload first, then fallback to legacy admin
+  let owner: Awaited<ReturnType<typeof prisma.user.findFirst>> = null;
+  const quidaxUserId = String(
+    (data as Record<string, unknown>).user_id ??
+    (data as Record<string, unknown>).userId ??
+    ((data as Record<string, unknown>).user as Record<string, unknown> | undefined)?.id ??
+    ''
+  );
+  if (quidaxUserId) {
+    owner = await prisma.user.findFirst({ where: { quidaxSubAccountId: quidaxUserId } });
+  }
+  if (!owner) {
+    // Fallback to legacy single-user resolution (preserves existing merchant deposits)
+    owner =
+      (await prisma.user.findFirst({ where: { role: 'ADMIN', status: 'ACTIVE' } })) ??
+      (await prisma.user.findFirst({ where: { status: 'ACTIVE' } }));
+  }
 
   if (!owner) {
     await errorEmail({ stage: 'owner resolution', depositId, error: 'No ACTIVE user found' });
@@ -229,8 +243,8 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Market sell + poll until filled (adapter throws on reject/cancel/timeout)
-      const filled = await exchangeService.sellBtcWithFill(btcAmount);
+      // Market sell + poll until filled (scoped to owner's sub-account)
+      const filled = await exchangeService.sellBtcWithFill(btcAmount, owner.id);
       const finalOrder = filled.providerOrderId ? filled : null;
       if (!finalOrder) throw new Error('Sell order returned empty');
 
@@ -305,7 +319,7 @@ export async function POST(request: NextRequest) {
         accountName: bankAccount.accountName,
         reference: withdrawRef,
         narration: 'KLASSIQ TRANSAKT auto-payout',
-      });
+      }, owner.id);
 
       withdrawTxn = await prisma.transaction.create({
         data: {

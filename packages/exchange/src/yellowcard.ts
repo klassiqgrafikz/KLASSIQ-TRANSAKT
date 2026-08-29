@@ -68,37 +68,37 @@ export class YellowCardAdapter implements ExchangeAdapter {
     throw new Error(`getMarketTrades not supported by ${this.provider}`);
   }
 
-  async placeOrder(input: PlaceOrderInput): Promise<SellOrder> {
+  async placeOrder(input: PlaceOrderInput, _subAccountId?: string): Promise<SellOrder> {
     // Yellow Card sell flow differs; route via existing createMarketSell for market side.
     if (input.type === 'market' && input.side === 'sell') return this.createMarketSell(input.volume);
     throw new Error(`placeOrder (${input.type}/${input.side}) not supported by ${this.provider} yet`);
   }
 
-  async cancelOrder(_orderId: string): Promise<void> {
+  async cancelOrder(_orderId: string, _subAccountId?: string): Promise<void> {
     throw new Error(`cancelOrder not supported by ${this.provider}`);
   }
 
-  async getUserOrders(_market?: string, _limit?: number): Promise<UserOrder[]> {
+  async getUserOrders(_market?: string, _limit?: number, _subAccountId?: string): Promise<UserOrder[]> {
     throw new Error(`getUserOrders not supported by ${this.provider}`);
   }
 
-  async getWallets(): Promise<WalletBalance[]> {
+  async getWallets(_subAccountId?: string): Promise<WalletBalance[]> {
     throw new Error(`getWallets not supported by ${this.provider}`);
   }
 
-  async getDefaultDepositAddress(_currency: string): Promise<DepositAddressInfo> {
+  async getDefaultDepositAddress(_currency: string, _subAccountId?: string): Promise<DepositAddressInfo> {
     throw new Error(`deposit addresses not supported by ${this.provider}`);
   }
 
-  async getDepositAddresses(_currency: string): Promise<DepositAddressInfo[]> {
+  async getDepositAddresses(_currency: string, _subAccountId?: string): Promise<DepositAddressInfo[]> {
     throw new Error(`deposit addresses not supported by ${this.provider}`);
   }
 
-  async createDepositAddress(_currency: string, _network?: string): Promise<DepositAddressInfo> {
+  async createDepositAddress(_currency: string, _network?: string, _subAccountId?: string): Promise<DepositAddressInfo> {
     throw new Error(`deposit address generation not supported by ${this.provider}`);
   }
 
-  async withdrawCrypto(_input: WithdrawCryptoInput): Promise<Withdrawal> {
+  async withdrawCrypto(_input: WithdrawCryptoInput, _subAccountId?: string): Promise<Withdrawal> {
     throw new Error(`crypto withdrawals not supported by ${this.provider}`);
   }
 
@@ -112,7 +112,7 @@ export class YellowCardAdapter implements ExchangeAdapter {
     throw new Error(`NGN on-ramp not supported by ${this.provider}`);
   }
 
-  async getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
+  async getDepositStatus(depositId: string, _subAccountId?: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }> {
     const response = await this.client.get(`/api/v1/deposits/${depositId}`);
     const data = response.data.data;
 
@@ -130,7 +130,7 @@ export class YellowCardAdapter implements ExchangeAdapter {
     };
   }
 
-  async createMarketSell(btcAmount: number): Promise<SellOrder> {
+  async createMarketSell(btcAmount: number, _subAccountId?: string): Promise<SellOrder> {
     const response = await this.client.post('/api/v1/sell', {
       from_currency: 'BTC',
       to_currency: 'NGN',
@@ -142,12 +142,12 @@ export class YellowCardAdapter implements ExchangeAdapter {
     return this.mapSellOrder(data);
   }
 
-  async getOrderStatus(orderId: string): Promise<SellOrder> {
+  async getOrderStatus(orderId: string, _subAccountId?: string): Promise<SellOrder> {
     const response = await this.client.get(`/api/v1/sell/${orderId}`);
     return this.mapSellOrder(response.data.data);
   }
 
-  async pollOrderUntilDone(orderId: string, timeoutMs = 15000, intervalMs = 1500): Promise<SellOrder> {
+  async pollOrderUntilDone(orderId: string, _subAccountId?: string, timeoutMs = 15000, intervalMs = 1500): Promise<SellOrder> {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {

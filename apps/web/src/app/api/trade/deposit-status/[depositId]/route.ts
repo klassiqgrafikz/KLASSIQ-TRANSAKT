@@ -29,8 +29,8 @@ export async function GET(
       return NextResponse.json({ error: 'Deposit not found' }, { status: 404 });
     }
 
-    // Check status from exchange
-    const status = await exchangeService.getDepositStatus(depositId);
+    // Check status from exchange (scoped to user's sub-account)
+    const status = await exchangeService.getDepositStatus(depositId, session.user.id);
 
     // Update transaction if status changed
     if (status.status !== transaction.status) {

@@ -72,6 +72,8 @@ model User {
   passwordHash  String?
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret String?
+  quidaxSubAccountId String? @unique
+  quidaxProvisionedAt DateTime?
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -91,6 +93,7 @@ model User {
   @@index([inviteCode])
   @@index([status])
   @@index([role])
+  @@index([quidaxSubAccountId])
 }
 
 model Session {

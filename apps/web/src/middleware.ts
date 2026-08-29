@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 const publicPaths = [
   '/',
   '/auth/login',
+  '/auth/register',
   '/auth/accept-invite',
   '/auth/request-invite',
   '/auth/error',

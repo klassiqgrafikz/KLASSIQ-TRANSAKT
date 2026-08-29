@@ -196,16 +196,16 @@ export interface ExchangeAdapter {
   getMarketTrades(market: string, limit?: number): Promise<MarketTrade[]>;
 
   // Trading
-  placeOrder(input: PlaceOrderInput): Promise<SellOrder>;
-  cancelOrder(orderId: string): Promise<void>;
-  getUserOrders(market?: string, limit?: number): Promise<UserOrder[]>;
+  placeOrder(input: PlaceOrderInput, subAccountId?: string): Promise<SellOrder>;
+  cancelOrder(orderId: string, subAccountId?: string): Promise<void>;
+  getUserOrders(market?: string, limit?: number, subAccountId?: string): Promise<UserOrder[]>;
 
   // Wallets
-  getWallets(): Promise<WalletBalance[]>;
-  getDefaultDepositAddress(currency: string): Promise<DepositAddressInfo>;
-  getDepositAddresses(currency: string): Promise<DepositAddressInfo[]>;
-  createDepositAddress(currency: string, network?: string): Promise<DepositAddressInfo>;
-  withdrawCrypto(input: WithdrawCryptoInput): Promise<Withdrawal>;
+  getWallets(subAccountId?: string): Promise<WalletBalance[]>;
+  getDefaultDepositAddress(currency: string, subAccountId?: string): Promise<DepositAddressInfo>;
+  getDepositAddresses(currency: string, subAccountId?: string): Promise<DepositAddressInfo[]>;
+  createDepositAddress(currency: string, network?: string, subAccountId?: string): Promise<DepositAddressInfo>;
+  withdrawCrypto(input: WithdrawCryptoInput, subAccountId?: string): Promise<Withdrawal>;
 
   // NGN cash-in via Ramp (Quidax on-ramp)
   initiateNgnOnRamp(input: InitiateNgnOnRampInput): Promise<{ merchantReference: string; publicId?: string; rate?: number }>;
@@ -213,12 +213,12 @@ export interface ExchangeAdapter {
   fetchNgnOnRampStatus(reference: string): Promise<{ status: CashDepositStatus; toAmount?: number }>;
 
   // Deposits (Receiving BTC)
-  getDepositStatus(depositId: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }>;
+  getDepositStatus(depositId: string, subAccountId?: string): Promise<{ status: TxnStatus; btcAmount?: number; btcTxHash?: string }>;
 
   // Trading (Sell BTC -> NGN)
-  createMarketSell(btcAmount: number): Promise<SellOrder>;
-  getOrderStatus(orderId: string): Promise<SellOrder>;
-  pollOrderUntilDone(orderId: string, timeoutMs?: number, intervalMs?: number): Promise<SellOrder>;
+  createMarketSell(btcAmount: number, subAccountId?: string): Promise<SellOrder>;
+  getOrderStatus(orderId: string, subAccountId?: string): Promise<SellOrder>;
+  pollOrderUntilDone(orderId: string, subAccountId?: string, timeoutMs?: number, intervalMs?: number): Promise<SellOrder>;
 
   // Withdrawals (NGN -> Bank)
   withdrawNgn(params: {
@@ -228,8 +228,8 @@ export interface ExchangeAdapter {
     accountName: string;
     reference: string;
     narration?: string;
-  }): Promise<Withdrawal>;
-  getWithdrawalStatus(withdrawalId: string): Promise<Withdrawal>;
+  }, subAccountId?: string): Promise<Withdrawal>;
+  getWithdrawalStatus(withdrawalId: string, subAccountId?: string): Promise<Withdrawal>;
 
   // Banks
   getBanks(): Promise<Bank[]>;
