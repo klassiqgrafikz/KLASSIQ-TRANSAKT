@@ -203,11 +203,22 @@ class ExchangeServiceImpl implements ExchangeService {
   async getDefaultDepositAddress(currency: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      // For Option A (different BTC addresses), sub-accounts are required.
-      // Merchant's single BTC/USDT address would be shared across INTERNAL users, so we block and surface a clear error.
-      // The retry in resolveSubAccountId above will have already retried with the fixed payload (no password).
-      // If we are still INTERNAL here, it means merchant is not enabled for sub-accounts — don't show a shared address.
-      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403). Enable sub-accounts on your Quidax merchant API key, or fund via Cash → USDT which uses per-user virtual accounts.');
+      const c = currency.toLowerCase();
+      // BTC/ETH on-chain deposits MUST be isolated per sub-account — merchant's single BTC address would be shared (the bug you saw).
+      // Keep blocking those and surface the 403. For Ramp Cash → USDT/USDC, the per-user isolation is via the virtual NGN account (merchantRef),
+      // so a shared merchant USDT dest is okay — the webhook credits the correct user via CashDepositIntent.merchantRef.
+      if (c === 'btc' || c === 'eth') {
+        throw new Error('Isolated BTC/ETH addresses unavailable — Quidax sub-account creation is blocked (403). Enable sub-accounts on your Quidax merchant API key, or fund via Cash → USDT/USDC (bank transfer) which is per-user and works without sub-accounts.');
+      }
+      // For USDT/USDC (used as Ramp dest), allow per-user generation via merchant multi-address.
+      // Each INTERNAL user gets a unique merchant-generated address (POST) mapped to them, so Cash → USDT remains per-user via merchantRef
+      const existing = await prisma.userDepositAddress.findFirst({ where: { userId, currency: c } });
+      if (existing) return { id: existing.id, currency: c, address: existing.address, network: existing.network, destinationTag: null };
+      const net = c === 'usdt' ? 'trc20' : c === 'usdc' ? 'bep20' : undefined;
+      const info = await this.quidaxAdapter.createDepositAddress(c, net, undefined);
+      if (!info.address) throw new Error('Address generation pending — try again in a few seconds');
+      await prisma.userDepositAddress.create({ data: { userId, currency: c, network: info.network ?? net ?? null, address: info.address } });
+      return info;
     }
     return this.quidaxAdapter.getDefaultDepositAddress(currency, subId);
   }
@@ -215,7 +226,11 @@ class ExchangeServiceImpl implements ExchangeService {
   async getDepositAddresses(currency: string, userId?: string): Promise<DepositAddressInfo[]> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403).');
+      const c = currency.toLowerCase();
+      if (c === 'btc' || c === 'eth') throw new Error('Isolated BTC/ETH addresses unavailable — sub-account blocked (403).');
+      const rows = await prisma.userDepositAddress.findMany({ where: { userId, currency: c } });
+      if (rows.length) return rows.map((r) => ({ id: r.id, currency: r.currency, address: r.address, network: r.network, destinationTag: null }));
+      return this.quidaxAdapter.getDepositAddresses(currency, undefined);
     }
     return this.quidaxAdapter.getDepositAddresses(currency, subId);
   }
@@ -223,7 +238,18 @@ class ExchangeServiceImpl implements ExchangeService {
   async createDepositAddress(currency: string, network?: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403). Enable sub-accounts or use Cash → USDT.');
+      const c = currency.toLowerCase();
+      if (c === 'btc' || c === 'eth') throw new Error('Isolated BTC/ETH addresses unavailable — sub-account blocked (403). Enable sub-accounts or use Cash → USDT.');
+      // USDT/USDC per-user via merchant multi-address + mapping is okay for Ramp dest
+      const info = await this.quidaxAdapter.createDepositAddress(c, network, undefined);
+      if (info.address) {
+        await prisma.userDepositAddress.upsert({
+          where: { address: info.address },
+          update: { userId, network: info.network ?? network ?? null },
+          create: { userId, currency: c, network: info.network ?? network ?? null, address: info.address },
+        });
+      }
+      return info;
     }
     return this.quidaxAdapter.createDepositAddress(currency, network, subId);
   }
