@@ -86,6 +86,10 @@ class ExchangeServiceImpl implements ExchangeService {
   }
 
   // ── Per-user sub-account helpers ───────────────────────────────
+  private isInternalSubAccountId(id?: string | null): boolean {
+    return !!id && id.startsWith('INTERNAL:');
+  }
+
   private async resolveSubAccountId(userId?: string): Promise<string | undefined> {
     if (!userId) return undefined;
     const user = await prisma.user.findUnique({
@@ -108,8 +112,28 @@ class ExchangeServiceImpl implements ExchangeService {
       });
       return subId;
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isForbidden = msg.includes('403') || msg.toLowerCase().includes('forbidden') || msg.includes('E0107');
+      if (isForbidden) {
+        console.warn(`[exchangeService] Sub-account creation forbidden for ${email} — falling back to internal ledger with per-user addresses (merchant multi-address)`);
+        const internalId = `INTERNAL:${userId}`;
+        await prisma.user.update({
+          where: { id: userId },
+          data: { quidaxSubAccountId: internalId, quidaxProvisionedAt: new Date() },
+        });
+        await prisma.auditLog.create({
+          data: {
+            userId,
+            action: 'QUIDAX_INTERNAL_FALLBACK',
+            entity: 'User',
+            entityId: userId,
+            after: { email, reason: msg.slice(0, 300) },
+          },
+        });
+        return internalId;
+      }
       console.error(`[exchangeService] Failed to provision sub-account for ${userId}`, e);
-      throw new Error(`Failed to provision exchange sub-account for ${email}: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(`Failed to provision exchange sub-account for ${email}: ${msg}`);
     }
   }
 
@@ -123,24 +147,76 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.resolveSubAccountId(userId);
   }
 
-  // ── Wallets (Quidax capability — now per-user) ──────────────────────
+  // ── Wallets (Quidax capability — now per-user, with INTERNAL fallback) ──────
+  private syntheticWalletsForInternal(): WalletBalance[] {
+    const list: WalletBalance[] = [
+      { currency: 'btc', balance: 0, locked: 0, isCrypto: true, convertedNgn: 0 },
+      { currency: 'usdt', balance: 0, locked: 0, isCrypto: true, convertedNgn: 0 },
+      { currency: 'eth', balance: 0, locked: 0, isCrypto: true, convertedNgn: 0 },
+      { currency: 'usdc', balance: 0, locked: 0, isCrypto: true, convertedNgn: 0 },
+      { currency: 'ngn', balance: 0, locked: 0, isCrypto: false, convertedNgn: 0 },
+    ];
+    return list;
+  }
+
   async getWallets(userId?: string): Promise<WalletBalance[]> {
     const subId = await this.resolveSubAccountId(userId);
+    if (this.isInternalSubAccountId(subId)) {
+      // For users where Quidax sub-account creation is forbidden (403), use internal ledger.
+      // Return synthetic 0 balances for now — webhook + transaction ledger will credit via address mapping.
+      // Future: derive from Transaction sums for ledger-based display.
+      return this.syntheticWalletsForInternal();
+    }
     return this.quidaxAdapter.getWallets(subId);
   }
 
   async getDefaultDepositAddress(currency: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
+    if (this.isInternalSubAccountId(subId) && userId) {
+      const c = currency.toLowerCase();
+      // Check existing per-user address in DB
+      const existing = await prisma.userDepositAddress.findFirst({
+        where: { userId, currency: c },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        return { id: existing.id, currency: c, address: existing.address, network: existing.network, destinationTag: null };
+      }
+      // Generate a new merchant address and claim it for this user
+      const info = await this.quidaxAdapter.createDepositAddress(c, undefined, undefined);
+      if (!info.address) throw new Error('Address generation pending — try again in a few seconds');
+      await prisma.userDepositAddress.create({
+        data: { userId, currency: c, network: info.network ?? null, address: info.address },
+      });
+      return info;
+    }
     return this.quidaxAdapter.getDefaultDepositAddress(currency, subId);
   }
 
   async getDepositAddresses(currency: string, userId?: string): Promise<DepositAddressInfo[]> {
     const subId = await this.resolveSubAccountId(userId);
+    if (this.isInternalSubAccountId(subId) && userId) {
+      const c = currency.toLowerCase();
+      const rows = await prisma.userDepositAddress.findMany({ where: { userId, currency: c } });
+      return rows.map((r) => ({ id: r.id, currency: r.currency, address: r.address, network: r.network, destinationTag: null }));
+    }
     return this.quidaxAdapter.getDepositAddresses(currency, subId);
   }
 
   async createDepositAddress(currency: string, network?: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
+    if (this.isInternalSubAccountId(subId) && userId) {
+      const c = currency.toLowerCase();
+      const info = await this.quidaxAdapter.createDepositAddress(c, network, undefined);
+      if (!info.address) return info; // pending
+      // Upsert per-user mapping
+      await prisma.userDepositAddress.upsert({
+        where: { address: info.address },
+        update: { userId, network: info.network ?? network ?? null },
+        create: { userId, currency: c, network: info.network ?? network ?? null, address: info.address },
+      });
+      return info;
+    }
     return this.quidaxAdapter.createDepositAddress(currency, network, subId);
   }
 

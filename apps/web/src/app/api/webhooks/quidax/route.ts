@@ -187,6 +187,22 @@ export async function POST(request: NextRequest) {
     owner = await prisma.user.findFirst({ where: { quidaxSubAccountId: quidaxUserId } });
   }
   if (!owner) {
+    // For INTERNAL fallback users, resolve via per-user deposit address mapping (merchant multi-address)
+    const depositAddr = String(
+      (data as Record<string, unknown>).address ??
+      (data as Record<string, unknown>).wallet_address ??
+      (data as Record<string, unknown>).to_address ??
+      (data as Record<string, unknown>).destination_address ??
+      ''
+    );
+    if (depositAddr) {
+      const mapping = await prisma.userDepositAddress.findUnique({ where: { address: depositAddr } });
+      if (mapping) {
+        owner = await prisma.user.findUnique({ where: { id: mapping.userId } });
+      }
+    }
+  }
+  if (!owner) {
     // Fallback to legacy single-user resolution (preserves existing merchant deposits)
     owner =
       (await prisma.user.findFirst({ where: { role: 'ADMIN', status: 'ACTIVE' } })) ??

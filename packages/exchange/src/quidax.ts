@@ -85,26 +85,36 @@ export class QuidaxAdapter implements ExchangeAdapter {
   // ── Sub-accounts (per-user isolation) ───────────────────────────
   /**
    * Create a Quidax sub-account for a platform user.
-   * Merchant API: POST /users { email, first_name, last_name, password }
+   * Merchant API: POST /users { email, first_name, last_name }
+   * Docs: https://docs.quidax.io/reference/create-sub-accounts
    * Returns sub_account_id to store on User.quidaxSubAccountId.
    */
   async createSubAccount(input: { email: string; firstName: string; lastName: string }): Promise<string> {
-    const password = `${randomBytes(12).toString('hex')}Aa1!`;
     try {
       const res = await this.client.post('/users', {
         email: input.email.toLowerCase(),
         first_name: input.firstName,
         last_name: input.lastName,
-        password,
-        password_confirmation: password,
       });
       const id = String(res.data?.data?.id ?? res.data?.id ?? '');
       if (!id) throw new Error('No id in create sub-account response');
       return id;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // If email already exists on Quidax, try to fetch existing user by email
-      // Merchant can list users: GET /users?q=email
+      // Extract Quidax error details for 403/400 debugging
+      let msg = e instanceof Error ? e.message : String(e);
+      let status: number | undefined;
+      let quidaxMsg: string | undefined;
+      let quidaxCode: string | undefined;
+      if (axios.isAxiosError(e)) {
+        status = e.response?.status;
+        const data = e.response?.data as Record<string, unknown> | undefined;
+        quidaxMsg = String((data as Record<string, unknown>)?.message ?? (data as Record<string, unknown>)?.error ?? '');
+        const d = (data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+        quidaxCode = String(d?.code ?? d?.message ?? '');
+        if (quidaxMsg) msg = `${quidaxMsg}${quidaxCode ? ` (${quidaxCode})` : ''}: ${msg}`;
+        if (status) msg = `[HTTP ${status}] ${msg}`;
+      }
+      // If email already exists on Quidax (409), try to fetch existing user by email
       try {
         const list = await this.client.get('/users', { params: { q: input.email.toLowerCase() } });
         const rows = Array.isArray(list.data?.data) ? list.data.data : [];

@@ -88,6 +88,7 @@ model User {
   receivedInvite Invite?    @relation("InviteRecipient")
   auditLogs     AuditLog[]
   cashDeposits  CashDepositIntent[]
+  depositAddresses UserDepositAddress[]
 
   @@index([email])
   @@index([inviteCode])
@@ -321,6 +322,22 @@ model CashDepositIntent {
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+model UserDepositAddress {
+  id        String   @id @default(cuid())
+  userId    String
+  currency  String
+  network   String?
+  address   String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, currency, network])
+  @@index([userId])
+  @@index([address])
+  @@index([currency])
 }
 
 model PlatformSettings {
