@@ -101,25 +101,74 @@ function CategoryChooser(props: {
 function DepositCrypto({ wallets }: Props) {
   const coins = useMemoCoinList(wallets);
   const [coin, setCoin] = useState(coins[0] ?? 'btc');
+  const [network, setNetwork] = useState('');
   const [addr, setAddr] = useState<{ address: string; network?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
+  const [pendingMsg, setPendingMsg] = useState('');
+
+  const fetchAddr = useCallback(async () => {
+    setLoading(true);
+    setPendingMsg('');
+    setGenError('');
+    try {
+      const r = await fetch(`/api/wallets/deposit-address?currency=${coin}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed to fetch address');
+      setAddr(j.address ?? null);
+      if (!j.address?.address && j.note) setPendingMsg(j.note);
+    } catch (e) {
+      setAddr(null);
+      setGenError(e instanceof Error ? e.message : 'Failed to fetch address');
+    } finally {
+      setLoading(false);
+    }
+  }, [coin]);
 
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    fetch(`/api/wallets/deposit-address?currency=${coin}`)
-      .then(r => r.json())
-      .then(j => { if (alive) setAddr(j.address ?? null); })
-      .catch(() => {})
-      .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    fetchAddr();
+  }, [fetchAddr]);
+
+  useEffect(() => {
+    setNetwork(defaultNetwork(coin));
   }, [coin]);
+
+  const generate = async () => {
+    setGenerating(true);
+    setGenError('');
+    setPendingMsg('');
+    try {
+      const net = network || defaultNetwork(coin);
+      const r = await fetch('/api/wallets/deposit-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: coin, ...(net ? { network: net } : {}) }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Generation failed');
+      if (j.address?.address) {
+        setAddr(j.address);
+        setPendingMsg('');
+      } else {
+        setPendingMsg(j.message || 'Address is being generated — check again in a few seconds.');
+        // auto-poll once after 4s
+        setTimeout(() => fetchAddr(), 4000);
+      }
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <CoinPicker coins={coins} coin={coin} onChange={setCoin} />
-      {loading ? <CenterSpin /> : addr?.address ? (
+      {loading ? (
+        <CenterSpin />
+      ) : addr?.address ? (
         <>
           <div className="p-4 rounded-lg border border-border bg-muted/30">
             <p className="text-xs text-muted-foreground mb-1">
@@ -127,15 +176,65 @@ function DepositCrypto({ wallets }: Props) {
             </p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs break-all font-mono">{addr.address}</code>
-              <Button size="sm" variant="outline"
-                onClick={() => { navigator.clipboard.writeText(addr.address); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(addr.address);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                }}
+              >
                 {copied ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
           </div>
           <InfoNote>Credits after network confirmations. Wrong asset sent here is lost.</InfoNote>
+          <Button size="sm" variant="ghost" className="w-full text-xs" onClick={fetchAddr}>
+            <RefreshCw className="h-3 w-3 mr-1" /> Refresh address
+          </Button>
         </>
-      ) : <EmptyState text={`No ${coin.toUpperCase()} address yet.`} />}
+      ) : (
+        <div className="space-y-3">
+          <div className="p-4 rounded-lg border border-dashed bg-muted/20 text-center space-y-2">
+            <p className="text-sm text-muted-foreground">No {coin.toUpperCase()} address yet for your personal wallet.</p>
+            <p className="text-xs text-muted-foreground">Each account has isolated addresses — generate yours below.</p>
+          </div>
+
+          {(coin === 'usdt' || coin === 'usdc' || coin === 'eth') && (
+            <label className="block space-y-1.5">
+              <span className="text-xs text-muted-foreground">Network</span>
+              <Select value={network} onChange={(e) => setNetwork(e.target.value)}>
+                {coin === 'usdt' && (
+                  <>
+                    <SelectOption value="trc20">TRC20 (Tron)</SelectOption>
+                    <SelectOption value="bep20">BEP20 (BSC)</SelectOption>
+                    <SelectOption value="erc20">ERC20 (Ethereum)</SelectOption>
+                  </>
+                )}
+                {coin === 'usdc' && (
+                  <>
+                    <SelectOption value="bep20">BEP20 (BSC)</SelectOption>
+                    <SelectOption value="erc20">ERC20 (Ethereum)</SelectOption>
+                    <SelectOption value="trc20">TRC20 (Tron)</SelectOption>
+                  </>
+                )}
+                {coin === 'eth' && <SelectOption value="erc20">ERC20 (Ethereum)</SelectOption>}
+              </Select>
+            </label>
+          )}
+
+          {genError && <Feedback ok={false} msg={genError} />}
+          {pendingMsg && <Feedback ok={false} msg={pendingMsg} />}
+
+          <Button className="w-full" onClick={generate} loading={generating} disabled={generating}>
+            Generate {coin.toUpperCase()} Address{network ? ` (${network})` : ''}
+          </Button>
+          <Button size="sm" variant="ghost" className="w-full text-xs" onClick={fetchAddr}>
+            <RefreshCw className="h-3 w-3 mr-1" /> I already generated — refresh
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
