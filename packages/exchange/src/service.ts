@@ -97,9 +97,39 @@ class ExchangeServiceImpl implements ExchangeService {
       select: { quidaxSubAccountId: true, role: true, email: true, name: true },
     });
     if (!user) throw new Error(`User not found: ${userId}`);
-    if (user.quidaxSubAccountId) return user.quidaxSubAccountId;
     // ADMIN retains merchant principal to preserve existing funded balance / avoid migration surprise
     if (user.role === 'ADMIN') return undefined;
+    if (user.quidaxSubAccountId) {
+      // If previously marked INTERNAL due to old buggy payload (with password) → retry with fixed payload
+      if (this.isInternalSubAccountId(user.quidaxSubAccountId)) {
+        const email = user.email;
+        const name = user.name || email.split('@')[0];
+        const [firstName, ...rest] = name.trim().split(/\s+/);
+        const lastName = rest.join(' ') || 'User';
+        try {
+          const subId = await this.quidaxAdapter.createSubAccount({ email, firstName, lastName });
+          await prisma.user.update({
+            where: { id: userId },
+            data: { quidaxSubAccountId: subId, quidaxProvisionedAt: new Date() },
+          });
+          await prisma.auditLog.create({
+            data: { userId, action: 'QUIDAX_SUBACCOUNT_RETRY_SUCCESS', entity: 'User', entityId: userId, after: { email, subId } },
+          });
+          console.log(`[exchangeService] INTERNAL→real sub-account success for ${email} → ${subId}`);
+          return subId;
+        } catch (retryErr) {
+          const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          const stillForbidden = retryMsg.includes('403') || retryMsg.toLowerCase().includes('forbidden') || retryMsg.includes('E0107');
+          if (stillForbidden) {
+            // Stay internal — merchant not enabled for sub-accounts; keep per-user merchant address fallback
+            return user.quidaxSubAccountId;
+          }
+          console.warn(`[exchangeService] Retry sub-account failed for ${email}:`, retryErr);
+          return user.quidaxSubAccountId;
+        }
+      }
+      return user.quidaxSubAccountId;
+    }
     const email = user.email;
     const name = user.name || email.split('@')[0];
     const [firstName, ...rest] = name.trim().split(/\s+/);
@@ -173,22 +203,11 @@ class ExchangeServiceImpl implements ExchangeService {
   async getDefaultDepositAddress(currency: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      const c = currency.toLowerCase();
-      // Check existing per-user address in DB
-      const existing = await prisma.userDepositAddress.findFirst({
-        where: { userId, currency: c },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (existing) {
-        return { id: existing.id, currency: c, address: existing.address, network: existing.network, destinationTag: null };
-      }
-      // Generate a new merchant address and claim it for this user
-      const info = await this.quidaxAdapter.createDepositAddress(c, undefined, undefined);
-      if (!info.address) throw new Error('Address generation pending — try again in a few seconds');
-      await prisma.userDepositAddress.create({
-        data: { userId, currency: c, network: info.network ?? null, address: info.address },
-      });
-      return info;
+      // For Option A (different BTC addresses), sub-accounts are required.
+      // Merchant's single BTC/USDT address would be shared across INTERNAL users, so we block and surface a clear error.
+      // The retry in resolveSubAccountId above will have already retried with the fixed payload (no password).
+      // If we are still INTERNAL here, it means merchant is not enabled for sub-accounts — don't show a shared address.
+      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403). Enable sub-accounts on your Quidax merchant API key, or fund via Cash → USDT which uses per-user virtual accounts.');
     }
     return this.quidaxAdapter.getDefaultDepositAddress(currency, subId);
   }
@@ -196,9 +215,7 @@ class ExchangeServiceImpl implements ExchangeService {
   async getDepositAddresses(currency: string, userId?: string): Promise<DepositAddressInfo[]> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      const c = currency.toLowerCase();
-      const rows = await prisma.userDepositAddress.findMany({ where: { userId, currency: c } });
-      return rows.map((r) => ({ id: r.id, currency: r.currency, address: r.address, network: r.network, destinationTag: null }));
+      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403).');
     }
     return this.quidaxAdapter.getDepositAddresses(currency, subId);
   }
@@ -206,16 +223,7 @@ class ExchangeServiceImpl implements ExchangeService {
   async createDepositAddress(currency: string, network?: string, userId?: string): Promise<DepositAddressInfo> {
     const subId = await this.resolveSubAccountId(userId);
     if (this.isInternalSubAccountId(subId) && userId) {
-      const c = currency.toLowerCase();
-      const info = await this.quidaxAdapter.createDepositAddress(c, network, undefined);
-      if (!info.address) return info; // pending
-      // Upsert per-user mapping
-      await prisma.userDepositAddress.upsert({
-        where: { address: info.address },
-        update: { userId, network: info.network ?? network ?? null },
-        create: { userId, currency: c, network: info.network ?? network ?? null, address: info.address },
-      });
-      return info;
+      throw new Error('Isolated deposit addresses unavailable — Quidax sub-account creation is blocked (403). Enable sub-accounts or use Cash → USDT.');
     }
     return this.quidaxAdapter.createDepositAddress(currency, network, subId);
   }
