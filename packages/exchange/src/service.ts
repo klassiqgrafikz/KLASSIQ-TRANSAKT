@@ -26,6 +26,12 @@ class ExchangeServiceImpl implements ExchangeService {
     return this.primary;
   }
 
+  private isConfigured(adapter: ExchangeAdapter): boolean {
+    if (adapter.provider === ExchangeProvider.QUIDAX) return Boolean(env.QUIDAX_API_KEY);
+    if (adapter.provider === ExchangeProvider.YELLOW_CARD) return Boolean(env.YELLOWCARD_API_KEY);
+    return true;
+  }
+
   private async withFallback<T>(operation: (adapter: ExchangeAdapter) => Promise<T>): Promise<T> {
     const primaryAdapter = this.getActiveAdapter();
     const fallbackAdapter = primaryAdapter === this.primary ? this.fallback : this.primary;
@@ -33,6 +39,11 @@ class ExchangeServiceImpl implements ExchangeService {
     try {
       return await operation(primaryAdapter);
     } catch (primaryError) {
+      const fallbackConfigured = this.isConfigured(fallbackAdapter);
+      if (!fallbackConfigured) {
+        console.warn(`Primary exchange (${primaryAdapter.provider}) failed and fallback (${fallbackAdapter.provider}) not configured — returning primary error:`, primaryError);
+        throw primaryError;
+      }
       console.warn(`Primary exchange (${primaryAdapter.provider}) failed, trying fallback (${fallbackAdapter.provider}):`, primaryError);
 
       try {
