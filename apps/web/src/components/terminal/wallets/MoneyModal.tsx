@@ -244,24 +244,27 @@ function DepositCrypto({ wallets }: Props) {
 
 /* ───────────── DEPOSIT · CASH ───────────── */
 
+type DepositMethod = 'card' | 'bank';
+
 function DepositCash({ userEmail, userName, onChanged }: Props) {
   const [toCoin, setToCoin] = useState('usdt');
   const [amount, setAmount] = useState('');
   const [network, setNetwork] = useState('');
-  const [stage, setStage] = useState<'form' | 'awaiting'>('form');
+  const [method, setMethod] = useState<DepositMethod>('card');
+  const [stage, setStage] = useState<'form' | 'awaiting' | 'card'>('form');
   const [bankDetails, setBankDetails] = useState<{
     accountNumber: string; bankName: string; accountName: string;
     amountExpected: number; processorFee?: number; merchantReference: string;
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number>(-1);
+  const [cardError, setCardError] = useState('');
 
   const amt = parseFloat(amount) || 0;
 
-  const start = async () => {
+  const startBankTransfer = async () => {
     setSubmitting(true);
     try {
-      // Destination = owner's own address for chosen coin
       const addrRes = await fetch(`/api/wallets/deposit-address?currency=${toCoin}`);
       const addrJson = await addrRes.json();
       const destAddress: string | undefined = addrJson.address?.address;
@@ -295,7 +298,57 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
     } finally { setSubmitting(false); }
   };
 
-  // Poll while awaiting payment
+  const startCardPayment = async () => {
+    setCardError('');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountNgn: amt,
+          metadata: { toCurrency: toCoin, network: network || defaultNetwork(toCoin) },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to initialize payment');
+
+      // Open Paystack inline checkout
+      const handler = (window as any).PaystackPop?.setup({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || (process.env as any).PAYSTACK_PUBLIC_KEY,
+        email: userEmail,
+        amount: Math.round(amt * 100),
+        reference: json.reference,
+        currency: 'NGN',
+        channels: ['card', 'bank'],
+        callback: async (response: any) => {
+          toast.success('Payment received — verifying...');
+          const verifyRes = await fetch(`/api/paystack/verify?ref=${encodeURIComponent(response.reference)}`);
+          const verifyJson = await verifyRes.json();
+          if (verifyJson.status === 'success') {
+            toast.success(`Credited! ₦${(verifyJson.amountNgn ?? amt).toLocaleString()} as ${toCoin.toUpperCase()}.`);
+            onChanged();
+          } else {
+            toast.error(verifyJson.error || 'Payment verification pending — will confirm via webhook');
+          }
+        },
+        onClose: () => {
+          // don't show error if success already handled
+        },
+      });
+
+      if (handler) {
+        handler.openIframe();
+        setStage('card');
+      } else {
+        throw new Error('Paystack not loaded');
+      }
+    } catch (e) {
+      setCardError(e instanceof Error ? e.message : 'Failed to start card payment');
+    } finally { setSubmitting(false); }
+  };
+
+  // Poll while awaiting bank transfer payment
   useEffect(() => {
     if (stage !== 'awaiting' || !bankDetails) return;
     const id = setInterval(async () => {
@@ -338,7 +391,7 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
           ))}
         </div>
 
-<Alert variant="warning">
+        <Alert variant="warning">
           Send <b>exactly ₦{bankDetails.amountExpected.toLocaleString()}</b> from an account matching your KLASSIQ name.
           Under/over payments are rejected & refunded by the provider.
         </Alert>
@@ -351,8 +404,43 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
     );
   }
 
+  if (stage === 'card') {
+    return (
+      <div className="space-y-4 text-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+        <p className="text-sm">Opening secure payment…</p>
+        <p className="text-xs text-muted-foreground">Complete the payment in the Paystack window</p>
+        {cardError && <p className="text-sm text-red-400">{cardError}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* Deposit Method Selector */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setMethod('card')}
+          className={cn('p-3 rounded-lg border-2 transition-colors text-sm font-medium', method === 'card' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50')}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span>💳</span> Bank Card
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Instant via Paystack</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMethod('bank')}
+          className={cn('p-3 rounded-lg border-2 transition-colors text-sm font-medium', method === 'bank' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50')}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span>🏦</span> Bank Transfer
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Via Quidax Ramp</p>
+        </button>
+      </div>
+
       <label className="block space-y-1.5">
         <span className="text-xs text-muted-foreground">You pay</span>
         <div className="relative">
@@ -383,17 +471,20 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
         </div>
       )}
 
-      <Button className="w-full h-11 font-semibold" onClick={start} loading={submitting} disabled={amt <= 0}>
-        Continue → Get Account Details
+      {method === 'card' && cardError && (
+        <p className="text-sm text-red-400">{cardError}</p>
+      )}
+
+      <Button className="w-full h-11 font-semibold" onClick={method === 'card' ? startCardPayment : startBankTransfer} loading={submitting} disabled={amt <= 0}>
+        {method === 'card' ? 'Pay with Card →' : 'Continue → Get Account Details'}
       </Button>
       <p className="text-[10px] text-center text-muted-foreground">
-        A one-time virtual account is generated for this exact amount.
+        {method === 'card' ? 'Secure payment via Paystack. Redirects back on completion.' : 'A one-time virtual account is generated for this exact amount.'}
       </p>
     </div>
   );
 
   function netEstimate(a: number): number {
-    // rough: assume ~1.5% total spread+fee before provider fees shown at confirm
     const rateGuess = toCoin === 'btc' ? 107_000_000 : toCoin === 'eth' ? 3_360_000 : toCoin === 'usdc' ? 1390 : 1391;
     return (a * 0.985) / rateGuess;
   }

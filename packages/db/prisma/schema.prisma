@@ -56,6 +56,7 @@ enum Direction {
 enum ExchangeProvider {
   YELLOW_CARD
   QUIDAX
+  PAYSTACK
 }
 
 model User {
@@ -78,17 +79,19 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      BankAccount[]
-  transactions  Transaction[]
-  apiKeys       ApiKey[]
-  paymentLinks  PaymentLink[]
-  rateAlerts    RateAlert[]
-  sessions      Session[]
-  invites       Invite[]    @relation("InviteCreator")
-  receivedInvite Invite?    @relation("InviteRecipient")
-  auditLogs     AuditLog[]
-  cashDeposits  CashDepositIntent[]
-  depositAddresses UserDepositAddress[]
+  accounts              BankAccount[]
+  transactions          Transaction[]
+  apiKeys               ApiKey[]
+  paymentLinks          PaymentLink[]
+  rateAlerts            RateAlert[]
+  sessions              Session[]
+  invites               Invite[]    @relation("InviteCreator")
+  receivedInvite        Invite?     @relation("InviteRecipient")
+  auditLogs             AuditLog[]
+  cashDeposits          CashDepositIntent[]
+  depositAddresses      UserDepositAddress[]
+  paystackTransactions  PaystackTransaction[]
+  paystackTransfers     PaystackTransfer[]
 
   @@index([email])
   @@index([inviteCode])
@@ -194,6 +197,9 @@ model Transaction {
   bankAccountId         String?
   bankAccount           BankAccount?     @relation(fields: [bankAccountId], references: [id])
 
+  paystackTransactionId String? @unique
+  paystackTransferId    String? @unique
+
   metadata              Json?
   errorMessage          String?
   completedAt           DateTime?
@@ -208,6 +214,8 @@ model Transaction {
   @@index([type])
   @@index([exchangeOrderId])
   @@index([paymentLinkId])
+  @@index([paystackTransactionId])
+  @@index([paystackTransferId])
 }
 
 model PaymentLink {
@@ -338,6 +346,45 @@ model UserDepositAddress {
   @@index([userId])
   @@index([address])
   @@index([currency])
+}
+
+model PaystackTransaction {
+  id            String   @id @default(cuid())
+  userId        String
+  reference     String   @unique
+  amountKobo    Int
+  currency      String   @default("NGN")
+  status        String   @default("pending") // pending | success | failed | abandoned
+  channel       String?  // card | bank | ussd | ...
+  metadata      Json?
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([reference])
+  @@index([status])
+}
+
+model PaystackTransfer {
+  id            String   @id @default(cuid())
+  userId        String
+  reference     String   @unique
+  recipientCode String
+  amountKobo    Int
+  status        String   @default("pending") // pending | success | failed | reversed
+  transferCode  String?
+  failureReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([reference])
+  @@index([status])
 }
 
 model PlatformSettings {

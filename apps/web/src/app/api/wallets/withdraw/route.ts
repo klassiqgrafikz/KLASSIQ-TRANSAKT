@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { exchangeService } from '@klassiq-transakt/exchange';
 import { prisma } from '@klassiq-transakt/db';
+import { createTransferRecipient, initiateTransfer } from '@/lib/paystack';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, txnId: txn.id, withdrawal });
     }
 
-    // ── NGN bank rail ────────────────────────────────────────────
+    // ── NGN bank rail: Try Paystack first, fallback to Quidax ──────────
     const account = await prisma.bankAccount.findFirst({
       where: { id: body.bankAccountId, userId },
     });
@@ -72,6 +73,63 @@ export async function POST(request: Request) {
     }
 
     const reference = `kt-ngn-${userId.slice(-6)}-${Date.now()}`;
+
+    // Try Paystack Transfer first
+    try {
+      const recipient = await createTransferRecipient({
+        type: 'nuban',
+        name: account.accountName,
+        account_number: account.accountNumber,
+        bank_code: account.bankCode,
+        currency: 'NGN',
+      });
+
+      if (recipient) {
+        const transfer = await initiateTransfer({
+          source: 'balance',
+          amountKobo: Math.round(body.amount * 100),
+          recipient_code: recipient.recipient_code,
+          reference,
+          reason: 'Withdrawal',
+        });
+
+        if (transfer) {
+          // Record Paystack transfer
+          await prisma.paystackTransfer.create({
+            data: {
+              userId,
+              reference: transfer.reference,
+              recipientCode: recipient.recipient_code,
+              amountKobo: Math.round(body.amount * 100),
+              status: transfer.status,
+              transferCode: transfer.transfer_code,
+            },
+          });
+
+          const txn = await prisma.transaction.create({
+            data: {
+              userId,
+              type: 'WITHDRAW',
+              status: transfer.status === 'success' ? 'COMPLETED' : 'PROCESSING',
+              provider: 'PAYSTACK',
+              ngnAmount: body.amount,
+              fees: 0,
+              bankAccountId: account.id,
+              paystackTransferId: transfer.reference,
+              metadata: { reference: transfer.reference, transferCode: transfer.transfer_code },
+              completedAt: transfer.status === 'success' ? new Date() : null,
+            },
+          });
+
+          return NextResponse.json({ success: true, txnId: txn.id, withdrawal: { status: transfer.status, reference: transfer.reference } });
+        }
+      }
+    } catch (paystackError) {
+      console.warn('[api/wallets/withdraw] Paystack transfer failed, falling back to Quidax:', paystackError);
+      // Fall through to Quidax
+    }
+
+    // Fallback to Quidax
     const withdrawal = await exchangeService.withdrawNgn({
       amount: body.amount,
       bankCode: account.bankCode,
