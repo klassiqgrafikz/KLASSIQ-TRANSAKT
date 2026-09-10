@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 function verifyPaystackSignature(body: string, signature: string): boolean {
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+  const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret) return false;
   const hash = crypto.createHmac('sha512', secret).update(body).digest('hex');
   return hash === signature;
