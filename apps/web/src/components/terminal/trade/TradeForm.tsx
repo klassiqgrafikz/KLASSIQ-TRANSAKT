@@ -5,6 +5,7 @@ import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Input } from '@klassiq-transakt/ui/components/Input';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
 import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Props {
   market: string;
@@ -23,7 +24,6 @@ export default function TradeForm({ market, base, quote, quotePrice, onOrderPlac
   const [price, setPrice] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const effectivePrice =
     type === 'market'
@@ -33,10 +33,8 @@ export default function TradeForm({ market, base, quote, quotePrice, onOrderPlac
   const total = effectivePrice * amountNum;
 
   const submit = async () => {
-    setFeedback(null);
-
-    if (amountNum <= 0) return setFeedback({ ok: false, msg: 'Enter an amount' });
-    if (type === 'limit' && effectivePrice <= 0) return setFeedback({ ok: false, msg: 'Enter a price' });
+    if (amountNum <= 0) return toast.error('Enter an amount');
+    if (type === 'limit' && effectivePrice <= 0) return toast.error('Enter a price');
 
     setSubmitting(true);
     try {
@@ -54,17 +52,14 @@ export default function TradeForm({ market, base, quote, quotePrice, onOrderPlac
       const json = await res.json();
 
       if (!res.ok) {
-        setFeedback({ ok: false, msg: json.error || 'Order rejected' });
+        toast.error(json.error || 'Order rejected');
       } else {
-        setFeedback({
-          ok: true,
-          msg: `${side === 'buy' ? 'Buy' : 'Sell'} order placed — ${amountNum} ${base.toUpperCase()}`,
-        });
+        toast.success(`${side === 'buy' ? 'Buy' : 'Sell'} order placed — ${amountNum} ${base.toUpperCase()}`);
         setAmount('');
         onOrderPlaced();
       }
     } catch {
-      setFeedback({ ok: false, msg: 'Network error' });
+      toast.error('Network error');
     } finally {
       setSubmitting(false);
     }
@@ -146,23 +141,6 @@ export default function TradeForm({ market, base, quote, quotePrice, onOrderPlac
           {total > 0 ? `${quote.toUpperCase()} ${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
         </span>
       </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div
-          className={cn(
-            'flex items-start gap-2 p-2.5 rounded-lg text-xs',
-            feedback.ok
-              ? 'bg-emerald-500/10 text-emerald-400'
-              : 'bg-red-500/10 text-red-400'
-          )}
-        >
-          {feedback.ok
-            ? <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-            : <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />}
-          <span>{feedback.msg}</span>
-        </div>
-      )}
 
       {/* Submit */}
       <Button

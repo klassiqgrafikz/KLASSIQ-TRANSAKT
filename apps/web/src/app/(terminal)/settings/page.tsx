@@ -6,10 +6,10 @@ import { Button } from '@klassiq-transakt/ui/components/Button';
 import { Input } from '@klassiq-transakt/ui/components/Input';
 import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@klassiq-transakt/ui/components/Card';
-import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@klassiq-transakt/ui/components/Dialog';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
-import { User, Mail, Shield, Bell, Key, Trash2, CheckCircle, AlertCircle, Monitor, Plus, Eye, EyeOff, Lock } from 'lucide-react';
+import { User, Mail, Shield, Bell, Key, Trash2, AlertCircle, Monitor, Plus, Eye, EyeOff, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -37,9 +37,6 @@ export default function SettingsPage() {
     emailRateAlerts: true,
     emailMarketing: false,
   });
-
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -76,10 +73,8 @@ export default function SettingsPage() {
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     if (!profile.name.trim()) {
-      setError('Full name is required');
+      toast.error('Full name is required');
       return;
     }
     setProfileSaving(true);
@@ -92,10 +87,9 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save profile');
       setProfile({ name: data.name, email: data.email });
-      setSuccess('Profile updated successfully');
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success('Profile updated successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save profile');
+      toast.error(err instanceof Error ? err.message : 'Failed to save profile');
     } finally {
       setProfileSaving(false);
     }
@@ -103,14 +97,12 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     if (security.newPassword !== security.confirmPassword) {
-      setError('New passwords do not match');
+      toast.error('New passwords do not match');
       return;
     }
     if (security.newPassword.length < 8) {
-      setError('New password must be at least 8 characters');
+      toast.error('New password must be at least 8 characters');
       return;
     }
     setSecuritySaving(true);
@@ -125,20 +117,18 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update password');
-      setSuccess('Password updated successfully');
       setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '', twoFactorEnabled: security.twoFactorEnabled });
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success('Password updated successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update password');
+      toast.error(err instanceof Error ? err.message : 'Failed to update password');
     } finally {
       setSecuritySaving(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    setError('');
     if (deleteConfirm !== 'DELETE') {
-      setError('Please type DELETE to confirm');
+      toast.error('Please type DELETE to confirm');
       return;
     }
     setDeleteLoading(true);
@@ -153,7 +143,7 @@ export default function SettingsPage() {
       // Hard delete succeeded — sign out to landing
       await signOut({ callbackUrl: '/' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete account');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete account');
     } finally {
       setDeleteLoading(false);
     }
@@ -172,8 +162,6 @@ export default function SettingsPage() {
             key={tab.id}
             onClick={() => {
               setActiveTab(tab.id as typeof activeTab);
-              setError('');
-              setSuccess('');
             }}
             className={cn(
               'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border-b-2 transition-colors',
@@ -187,19 +175,6 @@ export default function SettingsPage() {
           </button>
         ))}
       </div>
-
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription className="text-sm leading-relaxed">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {success && (
-        <Alert className="mb-6 bg-green-50 border-green-200 text-green-800">
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
 
       {activeTab === 'profile' && (
         <Card>
@@ -334,7 +309,7 @@ export default function SettingsPage() {
                 <SessionRow device="Chrome on Windows" location="Lagos, NG" time="2 hours ago" />
                 <SessionRow device="Safari on iPhone" location="Abuja, NG" time="1 day ago" />
               </div>
-              <Button variant="outline" className="w-full mt-4" onClick={() => alert('Revoke other sessions — coming soon')}>
+              <Button variant="outline" className="w-full mt-4" onClick={() => toast.info('Revoke other sessions — coming soon')}>
                 Revoke All Other Sessions
               </Button>
             </CardContent>
@@ -367,7 +342,7 @@ export default function SettingsPage() {
                 <CardTitle>API Keys</CardTitle>
                 <CardDescription>Manage your API keys for programmatic access</CardDescription>
               </div>
-              <Button onClick={() => alert('Create API Key — coming soon')}>
+              <Button onClick={() => toast.info('Create API Key — coming soon')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create API Key
               </Button>
@@ -455,7 +430,7 @@ function SessionRow({ current, device = 'Chrome on Windows', location = 'Lagos, 
         </div>
       </div>
       {!current && (
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => alert('Revoke session — coming soon')}>
+        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => toast.info('Revoke session — coming soon')}>
           Revoke
         </Button>
       )}

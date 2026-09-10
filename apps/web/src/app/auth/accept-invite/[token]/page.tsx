@@ -9,6 +9,7 @@ import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
 import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { Bitcoin, Mail, Lock, User, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface InviteData {
   email: string;
@@ -30,7 +31,6 @@ export default function AcceptInvitePage() {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -101,8 +101,8 @@ export default function AcceptInvitePage() {
         return;
       }
 
-      setSuccess(true);
-      setTimeout(() => router.push('/dashboard'), 2000);
+      toast.success('Account created! Signing you in...');
+      router.push('/dashboard');
     } catch {
       setError('An unexpected error occurred');
     } finally {
@@ -139,24 +139,6 @@ export default function AcceptInvitePage() {
               <Link href="/auth/login">
                 <Button variant="outline">Back to Login</Button>
               </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
-        <div className="w-full max-w-md">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600 mx-auto mb-4">
-                <CheckCircle className="h-8 w-8" />
-              </div>
-              <h2 className="text-xl font-bold mb-2">Account Created!</h2>
-              <p className="text-muted-foreground mb-6">Redirecting to dashboard...</p>
             </CardContent>
           </Card>
         </div>

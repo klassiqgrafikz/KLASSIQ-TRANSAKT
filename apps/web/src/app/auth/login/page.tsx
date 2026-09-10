@@ -10,6 +10,7 @@ import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
 import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { Bitcoin, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 function getFriendlyError(raw: string | null): string {
   if (!raw) return '';
@@ -23,9 +24,7 @@ function getFriendlyError(raw: string | null): string {
     return 'Account pending. Please accept your invite first.';
   if (raw.includes('AccessDenied'))
     return 'Access denied. Please contact support.';
-  // Insert space before camelCase if needed (e.g. CredentialsSignin -> Credentials Signin)
   const spaced = raw.replace(/([a-z])([A-Z])/g, '$1 $2');
-  // Don't show raw technical codes — default to friendly message
   if (spaced.length > 80) return 'Sign in failed. Please try again.';
   return spaced === raw ? raw : spaced;
 }
@@ -72,11 +71,12 @@ function LoginForm() {
       if (result?.error) {
         setFormError(result.error);
       } else {
+        toast.success('Welcome back!');
         router.push(callbackUrl);
         router.refresh();
       }
     } catch {
-      setFormError('An unexpected error occurred. Please try again.');
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }

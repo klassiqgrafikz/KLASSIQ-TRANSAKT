@@ -8,11 +8,11 @@ import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
 import { Select, SelectOption } from '@klassiq-transakt/ui/components/Select';
 import { Badge } from '@klassiq-transakt/ui/components/Badge';
-import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@klassiq-transakt/ui/components/Dialog';
 import { formatNgn, cn } from '@klassiq-transakt/ui/lib/utils';
 import { Plus, CheckCircle, Shield, Edit, Trash2, Copy, Loader2, Banknote, Search, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface BankAccount {
   id: string;
@@ -37,7 +37,6 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -84,12 +83,11 @@ export default function AccountsPage() {
   // Verify account number
   const verifyAccount = async () => {
     if (!formData.bankCode || !formData.accountNumber || formData.accountNumber.length !== 10) {
-      setError('Enter a valid 10-digit account number');
+      toast.error('Enter a valid 10-digit account number');
       return;
     }
 
     setIsVerifying(true);
-    setError('');
 
     try {
       const res = await fetch('/api/banks/verify', {
@@ -107,10 +105,10 @@ export default function AccountsPage() {
         setFormData(prev => ({ ...prev, accountName: data.accountName }));
       } else {
         const err = await res.json();
-        setError(err.error || 'Verification failed');
+        toast.error(err.error || 'Verification failed');
       }
     } catch (err) {
-      setError('Verification failed');
+      toast.error('Verification failed');
     } finally {
       setIsVerifying(false);
     }
@@ -119,15 +117,14 @@ export default function AccountsPage() {
   // Add bank account
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
     if (!formData.bankCode || !formData.accountNumber || !formData.accountName) {
-      setError('Fill in all fields');
+      toast.error('Fill in all fields');
       return;
     }
 
     if (formData.accountNumber.length !== 10) {
-      setError('Account number must be 10 digits');
+      toast.error('Account number must be 10 digits');
       return;
     }
 
@@ -149,8 +146,9 @@ export default function AccountsPage() {
       setFormData({ bankCode: '', accountNumber: '', accountName: '' });
       setVerificationResult(null);
       await fetchAccounts();
+      toast.success('Bank account added');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add account');
+      toast.error(err instanceof Error ? err.message : 'Failed to add account');
     } finally {
       setIsAdding(false);
     }
@@ -165,9 +163,13 @@ export default function AccountsPage() {
       
       if (res.ok) {
         await fetchAccounts();
+        toast.success('Default account updated');
+      } else {
+        toast.error('Failed to set default account');
       }
     } catch (err) {
       console.error('Failed to set default:', err);
+      toast.error('Failed to set default account');
     }
   };
 
@@ -182,9 +184,13 @@ export default function AccountsPage() {
       
       if (res.ok) {
         await fetchAccounts();
+        toast.success('Bank account deleted');
+      } else {
+        toast.error('Failed to delete account');
       }
     } catch (err) {
       console.error('Failed to delete:', err);
+      toast.error('Failed to delete account');
     }
   };
 
@@ -203,16 +209,11 @@ export default function AccountsPage() {
               Add Bank Account
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+<DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add Bank Account</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddAccount} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
 
               <div className="space-y-2">
                 <Label htmlFor="bankCode">Bank</Label>

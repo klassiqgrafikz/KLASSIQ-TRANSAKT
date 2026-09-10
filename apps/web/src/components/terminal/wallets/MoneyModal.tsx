@@ -12,6 +12,7 @@ import {
   Bitcoin, Banknote, Copy, CheckCircle2, Loader2, Info,
   ArrowLeft, RefreshCw, ExternalLink,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export type MoneyIntent = 'deposit' | 'withdraw';
 type Category = 'crypto' | 'cash' | null;
@@ -151,13 +152,14 @@ function DepositCrypto({ wallets }: Props) {
       if (j.address?.address) {
         setAddr(j.address);
         setPendingMsg('');
+        toast.success(`${coin.toUpperCase()} address generated`);
       } else {
         setPendingMsg(j.message || 'Address is being generated — check again in a few seconds.');
         // auto-poll once after 4s
         setTimeout(() => fetchAddr(), 4000);
       }
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'Generation failed');
+      toast.error(e instanceof Error ? e.message : 'Generation failed');
     } finally {
       setGenerating(false);
     }
@@ -183,6 +185,7 @@ function DepositCrypto({ wallets }: Props) {
                   navigator.clipboard.writeText(addr.address);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
+                  toast.success('Copied to clipboard');
                 }}
               >
                 {copied ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
@@ -224,8 +227,8 @@ function DepositCrypto({ wallets }: Props) {
             </label>
           )}
 
-          {genError && <Feedback ok={false} msg={genError} />}
-          {pendingMsg && <Feedback ok={false} msg={pendingMsg} />}
+          {genError && <div className="p-2.5 rounded-lg text-xs bg-red-500/10 text-red-400">{genError}</div>}
+          {pendingMsg && <div className="p-2.5 rounded-lg text-xs bg-amber-500/10 text-amber-400">{pendingMsg}</div>}
 
           <Button className="w-full" onClick={generate} loading={generating} disabled={generating}>
             Generate {coin.toUpperCase()} Address{network ? ` (${network})` : ''}
@@ -251,13 +254,11 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
     amountExpected: number; processorFee?: number; merchantReference: string;
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ ok: boolean | null; msg: string } | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number>(-1);
 
   const amt = parseFloat(amount) || 0;
 
   const start = async () => {
-    setStatusMsg(null);
     setSubmitting(true);
     try {
       // Destination = owner's own address for chosen coin
@@ -288,8 +289,9 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
       void destAddress;
       setStage('awaiting');
       onChanged();
+      toast.success('Virtual account generated — send the exact amount');
     } catch (e) {
-      setStatusMsg({ ok: false, msg: e instanceof Error ? e.message : 'Failed' });
+      toast.error(e instanceof Error ? e.message : 'Failed');
     } finally { setSubmitting(false); }
   };
 
@@ -302,8 +304,11 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
         const j = await res.json();
         if (j.final) {
           clearInterval(id);
-          if (j.status === 'completed') setStatusMsg({ ok: true, msg: `Credited! ${j.toAmount ?? ''} ${j.toCurrency?.toUpperCase()} added to your wallet.` });
-          else setStatusMsg({ ok: false, msg: 'Deposit failed or refunded — check your transfer details.' });
+          if (j.status === 'completed') {
+            toast.success(`Credited! ${j.toAmount ?? ''} ${j.toCurrency?.toUpperCase()} added to your wallet.`);
+          } else {
+            toast.error('Deposit failed or refunded — check your transfer details.');
+          }
         }
       } catch { /* keep polling */ }
     }, 8000);
@@ -333,12 +338,10 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
           ))}
         </div>
 
-        <Alert variant="warning">
+<Alert variant="warning">
           Send <b>exactly ₦{bankDetails.amountExpected.toLocaleString()}</b> from an account matching your KLASSIQ name.
-          Under/over payments are rejected &amp; refunded by the provider.
+          Under/over payments are rejected & refunded by the provider.
         </Alert>
-
-        {statusMsg && <Feedback ok={!!statusMsg.ok} msg={statusMsg.msg} />}
 
         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -380,8 +383,6 @@ function DepositCash({ userEmail, userName, onChanged }: Props) {
         </div>
       )}
 
-      {statusMsg && !statusMsg.ok && <Feedback ok={false} msg={statusMsg.msg} />}
-
       <Button className="w-full h-11 font-semibold" onClick={start} loading={submitting} disabled={amt <= 0}>
         Continue → Get Account Details
       </Button>
@@ -407,15 +408,13 @@ function WithdrawCrypto({ wallets }: Props) {
   const [network, setNetwork] = useState('');
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; m: string } | null>(null);
 
   const sel = funded.find(w => w.currency === currency);
   const amt = parseFloat(amount) || 0;
 
   const go = async () => {
-    setMsg(null);
-    if (!address || address.length < 10) return setMsg({ ok: false, m: 'Enter destination address' });
-    if (sel && amt > sel.balance) return setMsg({ ok: false, m: `Max: ${sel.balance}` });
+    if (!address || address.length < 10) return toast.error('Enter destination address');
+    if (sel && amt > sel.balance) return toast.error(`Max: ${sel.balance}`);
     if (!confirm(`Send ${amt} ${currency.toUpperCase()}?\n\nTo: ${address}${network ? `\nNetwork: ${network}` : ''}`)) return;
 
     setBusy(true);
@@ -426,9 +425,9 @@ function WithdrawCrypto({ wallets }: Props) {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
-      setMsg({ ok: true, m: 'Submitted! Tracking under Transactions.' });
+      toast.success('Submitted! Tracking under Transactions.');
     } catch (e) {
-      setMsg({ ok: false, m: e instanceof Error ? e.message : 'Failed' });
+      toast.error(e instanceof Error ? e.message : 'Failed');
     } finally { setBusy(false); }
   };
 
@@ -456,7 +455,6 @@ function WithdrawCrypto({ wallets }: Props) {
           <Button variant="outline" size="sm" type="button" onClick={() => setAmount(String(sel?.balance ?? ''))}>Max</Button>
         </div>
       </label>
-      {msg && <Feedback ok={msg.ok} msg={msg.m} />}
       <Button className={cn('w-full h-10 text-white', (!funded.length || amt <= 0) && 'cursor-not-allowed bg-zinc-700')}
         disabled={!funded.length || amt <= 0 || busy} onClick={go}>
         {busy ? 'Submitting…' : `Withdraw ${currency ? currency.toUpperCase() : ''}`}
@@ -482,7 +480,6 @@ function WithdrawCash({ onChanged }: Props) {
   const [amount, setAmount] = useState('');
   const amt = parseFloat(amount) || 0;
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; m: string } | null>(null);
 
   const loadAccounts = useCallback(async () => {
     setLoadingAccs(true);
@@ -527,16 +524,17 @@ function WithdrawCash({ onChanged }: Props) {
       await loadAccounts();
       setAccountId(saved.id);
       setShowAdd(false);
+      toast.success('Bank account saved');
     } catch (e) {
-      setMsg({ ok: false, m: e instanceof Error ? e.message : 'Save failed' });
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally { setSavingAcct(false); }
   };
 
   const submit = async () => {
     const amt = parseFloat(amount) || 0;
-    if (!accountId) return setMsg({ ok: false, m: 'Select a bank account' });
-    if (amt <= 0) return setMsg({ ok: false, m: 'Enter an amount' });
-    setBusy(true); setMsg(null);
+    if (!accountId) return toast.error('Select a bank account');
+    if (amt <= 0) return toast.error('Enter an amount');
+    setBusy(true);
     try {
       const r = await fetch('/api/wallets/withdraw', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -544,10 +542,10 @@ function WithdrawCash({ onChanged }: Props) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Failed');
-      setMsg({ ok: true, m: `₦${amt.toLocaleString()} on its way!` });
+      toast.success(`₦${amt.toLocaleString()} on its way!`);
       setTimeout(() => { onChanged(); }, 1500);
     } catch (e) {
-      setMsg({ ok: false, m: e instanceof Error ? e.message : 'Failed' });
+      toast.error(e instanceof Error ? e.message : 'Failed');
     } finally { setBusy(false); }
   };
 
@@ -581,15 +579,13 @@ function WithdrawCash({ onChanged }: Props) {
               : resolved !== null ? <p className={cn('text-xs font-medium', resolved ? 'text-emerald-400' : 'text-red-400')}>{resolved ? `✓ ${resolved}` : '✗ Account not found — check details'}</p> : null
           )}
           <Button size="sm" variant="outline" className="w-full" disabled={!nBank || nAcct.length !== 10 || savingAcct}
-            onClick={saveAndUse} loading={savingAcct}>Save &amp; use this account</Button>
+            onClick={saveAndUse} loading={savingAcct}>Save & use this account</Button>
         </div>
       )}
 
       <label className="block space-y-1.5"><span className="text-xs text-muted-foreground">Amount (₦)</span>
         <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="10000" className="font-mono tabular-nums" />
       </label>
-
-      {msg && <Feedback ok={msg.ok} msg={msg.m} />}
 
       <Button className="w-full h-10" onClick={submit} disabled={busy || !accountId || amt <= 0} loading={busy}>
         Withdraw ₦{amt > 0 ? amt.toLocaleString() : ''}
@@ -618,9 +614,6 @@ function CenterSpin() { return <div className="py-10 flex justify-center"><Loade
 function EmptyState({ text }: { text: string }) { return <div className="py-6 text-center text-sm text-muted-foreground">{text}</div>; }
 function InfoNote({ children }: { children: React.ReactNode }) {
   return <div className="flex gap-2 p-3 rounded-lg bg-blue-500/10 text-blue-300 text-xs"><Info className="h-4 w-4 shrink-0 mt-0.5" /><p>{children}</p></div>;
-}
-function Feedback({ ok, msg }: { ok: boolean; msg: string }) {
-  return <div className={cn('p-2.5 rounded-lg text-xs', ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400')}>{msg}</div>;
 }
 function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
   return <div className="flex justify-between"><span className="text-muted-foreground">{k}</span><span className={cn('font-mono tabular-nums', muted && 'text-muted-foreground italic')}>{v}</span></div>;

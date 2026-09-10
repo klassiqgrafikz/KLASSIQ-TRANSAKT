@@ -11,6 +11,7 @@ import {
   ArrowLeftRight, Loader2, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import type { MarketTicker } from '@klassiq-transakt/exchange';
+import { toast } from 'sonner';
 
 const COINS = ['btc', 'usdt', 'eth', 'sol', 'xrp', 'ltc', 'bch', 'trx'];
 
@@ -19,7 +20,6 @@ export default function ConvertPage() {
   const [fromCoin, setFromCoin] = useState('btc');
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const availableCoins = useMemo(
     () => COINS.filter(c => tickers.some(t => t.market === `${c}ngn`)),
@@ -49,8 +49,7 @@ export default function ConvertPage() {
   const net = Math.max(gross - estFee, 0);
 
   const submit = async () => {
-    setFeedback(null);
-    if (amt <= 0) return setFeedback({ ok: false, msg: 'Enter an amount' });
+    if (amt <= 0) return toast.error('Enter an amount');
 
     setSubmitting(true);
     try {
@@ -66,10 +65,10 @@ export default function ConvertPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Swap failed');
-      setFeedback({ ok: true, msg: `Sold ${amt} ${fromCoin.toUpperCase()} for ≈${formatNgn(net)} NGN` });
+      toast.success(`Sold ${amt} ${fromCoin.toUpperCase()} for ≈${formatNgn(net)} NGN`);
       setAmount('');
     } catch (e) {
-      setFeedback({ ok: false, msg: e instanceof Error ? e.message : 'Swap failed' });
+      toast.error(e instanceof Error ? e.message : 'Swap failed');
     } finally {
       setSubmitting(false);
     }
@@ -125,17 +124,6 @@ export default function ConvertPage() {
               {net > 0 ? formatNgn(net) : formatNgn(0)}
             </p>
           </div>
-
-          {feedback && (
-            <div className={cn(
-              'flex items-start gap-2 p-2.5 rounded-lg text-xs',
-              feedback.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-            )}>
-              {feedback.ok ? <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                : <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />}
-              <span>{feedback.msg}</span>
-            </div>
-          )}
 
           <Button
             onClick={submit}

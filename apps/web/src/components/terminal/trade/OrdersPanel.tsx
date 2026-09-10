@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import type { UserOrder } from '@klassiq-transakt/exchange';
 import { cn } from '@klassiq-transakt/ui/lib/utils';
+import { toast } from 'sonner';
 
 interface Props {
   market: string;
@@ -37,7 +38,15 @@ export default function OrdersPanel({ market, refreshKey }: Props) {
     setCancellingId(id);
     try {
       const res = await fetch(`/api/trade/orders/${id}`, { method: 'DELETE' });
-      if (res.ok || res.status === 400) load(); // even if already filled/cancelled
+      if (res.ok) {
+        toast.success('Order cancelled');
+        load();
+      } else if (res.status === 400) {
+        toast.error('Order already filled or cancelled');
+        load();
+      } else {
+        toast.error('Failed to cancel order');
+      }
     } finally {
       setCancellingId(null);
     }

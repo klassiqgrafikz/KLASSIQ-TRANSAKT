@@ -9,6 +9,7 @@ import { Label } from '@klassiq-transakt/ui/components/Label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@klassiq-transakt/ui/components/Card';
 import { Alert, AlertDescription } from '@klassiq-transakt/ui/components/Alert';
 import { Bitcoin, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,6 +49,7 @@ export default function RegisterPage() {
         setError(data.error || 'Failed to create account');
         return;
       }
+      toast.success('Account created! Please sign in.');
       router.push('/auth/login?registered=1');
     } catch {
       setError('An unexpected error occurred. Please try again.');
