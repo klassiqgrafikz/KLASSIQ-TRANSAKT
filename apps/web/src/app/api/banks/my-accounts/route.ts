@@ -3,6 +3,21 @@ import { prisma } from '@klassiq-transakt/db';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const accounts = await prisma.bankAccount.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return NextResponse.json(accounts);
+  } catch (error) {
+    console.error('List bank accounts error:', error);
+    return NextResponse.json({ error: 'Failed to load accounts' }, { status: 500 });
+  }
+}
+
 const createAccountSchema = z.object({
   bankCode: z.string().length(3),
   accountNumber: z.string().length(10),
